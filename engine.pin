@@ -1,10 +1,10 @@
 {
   "engine": "pegasus-harness",
   "repo": "balerdis/pegasus-harness",
-  "tag": "v5.35.0",
+  "tag": "v5.36.0",
   "assets": {
     "pegasus": {
-      "sha256": "95ec0c69b8227278eb1b6284a6b8db88afe25bc5327b7a0e1d847f0ecd6ab865",
+      "sha256": "f7d894723bd376440a12117ca93afa384c87f1c2f3d47300c308f595a487ed43",
       "url_template": "https://github.com/balerdis/pegasus-harness/releases/download/{tag}/pegasus"
     },
     "build_zipapp.py": {
@@ -23,6 +23,6 @@
   "verified_against": {
     "source": "release-manifest.json",
     "agrees": true,
-    "note": "Hashes were downloaded from the published v5.35.0 release assets and hashed independently, then checked again by re-fetching the URL this pin itself names. Only the pegasus artifact changed: install.sh and the two builder scripts are byte-identical to v5.28.0 and earlier. v5.35.0 closes or narrows four families of technical debt upstream, attacked by the problem each one causes rather than by module. Guards that approved without looking: the coverage guard for tools accepted a script whose name appeared anywhere in a test, so a comment satisfied it, and the approved inclusion lists were hand-kept in the very document the release gate says to read. Both now derive from the tree. Invariants that existed in only one direction: the placeholder vocabulary declared seven names while a body render answered one, so a wrong marker passed content validation and broke the install two commands later, and no front matter had a closed vocabulary at all, which meant a typo in withheld_tools loaded clean while the server handed over the destructive tools the descriptor appeared to be holding back. What matters for this distribution is the fourth family. A body that travels verbatim -- every .py and .ts, since substitution reaches only .md and .txt -- may no longer name the engine brand, and a new guard derives that rule from the tree and from identity.json instead of a hand-written list. The one-line docstring fix this repository had been carrying as accepted residue for five releases, with a note promising it in the engine next release, landed with it. So this pin is the first in a while that is not only an alignment: the residue entry for Pegasus skill index no longer matches anything in the corpus, and the staleness guard is expected to demand its removal on the next run. That is the mechanism working, and the entry is removed because the product refuses to continue with an excuse that stopped applying, not because someone remembered."
+    "note": "Hashes were downloaded from the published v5.36.0 release assets and hashed independently, then checked again by re-fetching the URL this pin itself names. Only the pegasus artifact changed: install.sh and the two builder scripts are byte-identical to v5.28.0 and earlier. v5.36.0 does two things that matter here. It declares, where the map is read, that the runtime folds edit, write and apply_patch onto a single permission -- so the wildcard this render emits does not close what it does not name, and writing apply_patch into either table would be a key nothing reads rather than a restriction. That debt does not close: the tool still reaches every agent that can write, and the other way out depends on a third party that has declined it twice. What closes is the possibility of reading the render wrong from inside the product. And it makes the suite stop waiting on the disk: fsync measures 6302 microseconds on ext4 against 1.2 on tmpfs, a test that installed 113 artifacts paid 226 of those waits, and there is now one single way to create a throwaway home -- in memory, falling back to disk where there is no /dev/shm -- with a guard that requires it. This distribution changed nothing of its own for this pin beyond the alignment."
   }
 }
