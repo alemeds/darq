@@ -1,10 +1,10 @@
 {
   "engine": "pegasus-harness",
   "repo": "balerdis/pegasus-harness",
-  "tag": "v5.36.0",
+  "tag": "v5.37.0",
   "assets": {
     "pegasus": {
-      "sha256": "f7d894723bd376440a12117ca93afa384c87f1c2f3d47300c308f595a487ed43",
+      "sha256": "730fbf30b980f074db3a321e6bb391313bdcdf13ceeca5cba53df1d43a8e2a4e",
       "url_template": "https://github.com/balerdis/pegasus-harness/releases/download/{tag}/pegasus"
     },
     "build_zipapp.py": {
@@ -23,6 +23,6 @@
   "verified_against": {
     "source": "release-manifest.json",
     "agrees": true,
-    "note": "Hashes were downloaded from the published v5.36.0 release assets and hashed independently, then checked again by re-fetching the URL this pin itself names. Only the pegasus artifact changed: install.sh and the two builder scripts are byte-identical to v5.28.0 and earlier. v5.36.0 does two things that matter here. It declares, where the map is read, that the runtime folds edit, write and apply_patch onto a single permission -- so the wildcard this render emits does not close what it does not name, and writing apply_patch into either table would be a key nothing reads rather than a restriction. That debt does not close: the tool still reaches every agent that can write, and the other way out depends on a third party that has declined it twice. What closes is the possibility of reading the render wrong from inside the product. And it makes the suite stop waiting on the disk: fsync measures 6302 microseconds on ext4 against 1.2 on tmpfs, a test that installed 113 artifacts paid 226 of those waits, and there is now one single way to create a throwaway home -- in memory, falling back to disk where there is no /dev/shm -- with a guard that requires it. This distribution changed nothing of its own for this pin beyond the alignment."
+    "note": "Hashes were downloaded from the published v5.37.0 release assets and hashed independently, then checked again by re-fetching the URL this pin itself names. Only the pegasus artifact changed: install.sh and the two builder scripts are byte-identical to v5.28.0 and earlier. v5.37.0 fixes one thing that reaches this distribution directly. Renaming only the internal id of an append -- one of the three lines the engine adds inside the host's own opencode.json: the skills path, the notifier plugin, the system prompt -- while leaving the value identical made install treat it as a foreign collision, skip it, and then retire the old record: the line vanished from the document for one run and came back on the next. That matters here because a distribution is exactly where those ids move: the engine renders them from its own source, and any release that renames one would have cost its installations a run. The exclusion that keeps the engine from claiming the person's own list items did not change -- an append still has no address, because the pointer names the list and never one item -- and the new recognition by fingerprint is consulted only after both the id and the address lookups fail. An adversarial review reported that the change would let the engine adopt and later delete a hand-written line; running the same scenario against the fixed tree and against the previous one gave identical results, so that deletion is the accepted limitation of locating an append by fingerprint and not something this change introduces. This distribution changed nothing of its own for this pin beyond the alignment."
   }
 }
