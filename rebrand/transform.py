@@ -38,10 +38,22 @@ class RebrandMap:
         return dict(self.renames)
 
 
+class RebrandIOError(RuntimeError):
+    """A read, write, remove or rename that :func:`load_map` or :func:`apply_to_tree` needed
+    failed at the filesystem. Always fatal, and always names the file and the OS reason -- never
+    a bare traceback out of ``Path.read_text``/``write_text``/``unlink``/``replace``. See D13 in
+    the README's "Deudas" table: this is the same "named refusal" shape `tools.build_darq
+    .fetch_pinned_assets` already uses, applied here."""
+
+
 def load_map(path: Path) -> RebrandMap:
     """Parse ``rebrand.json`` into a :class:`RebrandMap`. The only I/O in this function is the
     single read of ``path`` itself; everything else is pure construction."""
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise RebrandIOError(f"could not read rebrand map {path}: {exc}") from exc
+    payload = json.loads(raw)
     return parse_map(payload)
 
 
@@ -197,12 +209,28 @@ def apply_to_tree(content_root: Path, rebrand_map: RebrandMap) -> None:
         target_relative = rename_relative_path(relative_posix, rebrand_map)
         target_path = content_root / target_relative
         if should_substitute_body(relative_posix, rebrand_map):
-            text = path.read_text(encoding="utf-8")
+            try:
+                text = path.read_text(encoding="utf-8")
+            except OSError as exc:
+                raise RebrandIOError(f"could not read {path} to rebrand it: {exc}") from exc
             new_text = substitute_body(text, rebrand_map)
             if target_path != path:
-                path.unlink()
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            target_path.write_text(new_text, encoding="utf-8")
+                try:
+                    path.unlink()
+                except OSError as exc:
+                    raise RebrandIOError(
+                        f"could not remove {path} after rebranding it to {target_path}: {exc}"
+                    ) from exc
+            try:
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                target_path.write_text(new_text, encoding="utf-8")
+            except OSError as exc:
+                raise RebrandIOError(
+                    f"could not write rebranded content to {target_path}: {exc}"
+                ) from exc
         elif target_path != path:
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            path.replace(target_path)
+            try:
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                path.replace(target_path)
+            except OSError as exc:
+                raise RebrandIOError(f"could not rename {path} to {target_path}: {exc}") from exc

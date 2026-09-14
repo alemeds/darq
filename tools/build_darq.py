@@ -68,7 +68,17 @@ class BuildError(RuntimeError):
 
 
 def load_pin(path: Path = ENGINE_PIN) -> dict:
-    return json.loads(path.read_text(encoding="utf-8"))
+    """Load and parse `engine.pin`. A `BuildError` names `path` and the reason on either of its
+    two ways to fail -- unreadable (permissions, missing) or present but not valid JSON -- never a
+    bare traceback. See D13 in the README's "Deudas" table."""
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise BuildError(f"could not read {path} to load the engine pin: {exc}") from exc
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise BuildError(f"{path} is not valid JSON ({exc}); fix its syntax and retry") from exc
 
 
 def asset_url(pin: dict, asset_name: str) -> str:
@@ -163,8 +173,13 @@ def extract_pegasus_package(pegasus_binary: Path, work_dir: Path) -> Path:
         shutil.rmtree(extracted)
     if not zipfile.is_zipfile(pegasus_binary):
         raise BuildError(f"{pegasus_binary} is not a valid zipapp (zipfile.is_zipfile() is False)")
-    with zipfile.ZipFile(pegasus_binary) as archive:
-        archive.extractall(extracted)
+    try:
+        with zipfile.ZipFile(pegasus_binary) as archive:
+            archive.extractall(extracted)
+    except (OSError, zipfile.BadZipFile) as exc:
+        raise BuildError(
+            f"could not extract {pegasus_binary} into {extracted}: {exc}"
+        ) from exc
     package = extracted / "pegasus"
     if not (package / "__main__.py").is_file():
         raise BuildError(f"{package} has no __main__.py; extraction did not produce the expected layout")
@@ -184,7 +199,14 @@ def persist_raw_content_copy(content_root: Path, raw_content_dir: Path) -> None:
     if raw_content_dir.exists():
         shutil.rmtree(raw_content_dir)
     raw_content_dir.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(content_root, raw_content_dir)
+    try:
+        shutil.copytree(content_root, raw_content_dir)
+    except OSError as exc:
+        # `shutil.Error` (raised when `copytree` hits per-file failures, e.g. an unreadable
+        # source file) is itself a subclass of `OSError`, so this one clause already covers both.
+        raise BuildError(
+            f"could not copy raw content from {content_root} to {raw_content_dir}: {exc}"
+        ) from exc
 
 
 class OverlayCollisionError(RuntimeError):
@@ -332,6 +354,32 @@ def format_checksum_sidecar(sha256_digest: str, filename: str) -> str:
     return f"{sha256_digest}  {filename}\n"
 
 
+def write_checksum_sidecar(out: Path, sha256_digest: str, filename: str) -> Path:
+    """Write `<out>.sha256` in `format_checksum_sidecar`'s format and return its path. A
+    `BuildError` names the sidecar path and the reason on failure -- e.g. a broken permission or a
+    full disk -- instead of a bare traceback. See D13."""
+    checksum_path = out.with_name(out.name + ".sha256")
+    try:
+        checksum_path.write_text(format_checksum_sidecar(sha256_digest, filename), encoding="utf-8")
+    except OSError as exc:
+        raise BuildError(
+            f"could not write checksum sidecar {checksum_path} for {filename}: {exc}"
+        ) from exc
+    return checksum_path
+
+
+def read_checksum_sidecar(path: Path, *, artifact_name: str) -> str:
+    """Read and strip a `.sha256` sidecar `path`, for logging. A `BuildError` names `path`, the
+    artifact it documents (`artifact_name`) and the reason on failure -- e.g. missing or
+    unreadable -- instead of a bare traceback. See D13."""
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        raise BuildError(
+            f"could not read {artifact_name}'s checksum sidecar at {path}: {exc}"
+        ) from exc
+
+
 def run_build_installer(
     build_installer_py: Path, template: Path, package_source: Path, identity: Path, out: Path
 ) -> None:
@@ -359,9 +407,23 @@ def run_build_installer(
     if not out.is_file():
         raise BuildError(f"build_installer.py exited 0 but did not write {out}")
 
-    checksum_path = out.with_name(out.name + ".sha256")
-    checksum_path.write_text(format_checksum_sidecar(sha256_of(out), out.name), encoding="utf-8")
+    checksum_path = write_checksum_sidecar(out, sha256_of(out), out.name)
     print(f"WROTE checksum: {checksum_path}")
+
+
+def load_rebrand_map(path: Path = REBRAND_JSON) -> RebrandMap:
+    """Load and parse `rebrand.json` into a `RebrandMap`. A `BuildError` names `path` and the
+    reason on either of its two ways to fail -- unreadable or present but not valid JSON -- the
+    same shape `load_pin` uses for `engine.pin`. See D13."""
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise BuildError(f"could not read {path} to load the rebrand map: {exc}") from exc
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise BuildError(f"{path} is not valid JSON ({exc}); fix its syntax and retry") from exc
+    return parse_map(payload)
 
 
 def build(
@@ -391,7 +453,7 @@ def build(
     persist_raw_content_copy(package / "content", raw_content_dir)
     print(f"PERSISTED: raw (unrebranded) content copy at {raw_content_dir}")
 
-    rebrand_map = parse_map(json.loads(REBRAND_JSON.read_text(encoding="utf-8")))
+    rebrand_map = load_rebrand_map()
     apply_to_tree(package / "content", rebrand_map)
     print("REBRANDED: content tree rewritten in place")
 
@@ -404,13 +466,16 @@ def build(
     if not checksum_path.is_file():
         raise BuildError(f"build_zipapp.py did not write {checksum_path}")
     print(f"BUILT: {out}")
-    print(f"CHECKSUM: {checksum_path.read_text(encoding='utf-8').strip()}")
+    print(f"CHECKSUM: {read_checksum_sidecar(checksum_path, artifact_name=out.name)}")
 
     installer_out.parent.mkdir(parents=True, exist_ok=True)
     run_build_installer(assets["build_installer.py"], assets["install.sh"], package, IDENTITY_JSON, installer_out)
     installer_checksum_path = installer_out.with_name(installer_out.name + ".sha256")
     print(f"BUILT: {installer_out}")
-    print(f"CHECKSUM: {installer_checksum_path.read_text(encoding='utf-8').strip()}")
+    print(
+        f"CHECKSUM: "
+        f"{read_checksum_sidecar(installer_checksum_path, artifact_name=installer_out.name)}"
+    )
 
     return out
 

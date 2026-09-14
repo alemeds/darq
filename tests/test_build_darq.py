@@ -7,10 +7,12 @@ is I/O -- downloading, invoking `build_installer.py`, writing files -- and is ex
 """
 from __future__ import annotations
 
+import os
 import shutil
 import sys
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -113,6 +115,171 @@ class RawContentCopyTests(unittest.TestCase):
             build_darq.raw_content_dir_for(build_darq.DEFAULT_WORK_DIR),
             build_darq.DEFAULT_RAW_CONTENT_DIR,
         )
+
+
+class LoadPinNamedRefusalTests(unittest.TestCase):
+    """D13: `load_pin`'s read must refuse by naming `engine.pin` and the reason -- both an
+    unreadable file and malformed JSON -- instead of a bare traceback."""
+
+    def setUp(self) -> None:
+        self.work_dir = Path(tempfile.mkdtemp(dir="/dev/shm", prefix="darq-load-pin-"))
+        self.addCleanup(shutil.rmtree, self.work_dir, ignore_errors=True)
+
+    def test_unreadable_file_names_the_path_and_the_reason(self) -> None:
+        path = self.work_dir / "engine.pin"
+        path.write_text("{}", encoding="utf-8")
+        os.chmod(path, 0o000)
+        self.addCleanup(os.chmod, path, 0o644)
+
+        with self.assertRaises(build_darq.BuildError) as ctx:
+            build_darq.load_pin(path)
+
+        message = str(ctx.exception)
+        self.assertIn(str(path), message)
+        self.assertIn("Permission denied", message)
+
+    def test_malformed_json_names_the_path_and_the_reason(self) -> None:
+        path = self.work_dir / "engine.pin"
+        path.write_text("{not valid json", encoding="utf-8")
+
+        with self.assertRaises(build_darq.BuildError) as ctx:
+            build_darq.load_pin(path)
+
+        message = str(ctx.exception)
+        self.assertIn(str(path), message)
+        self.assertIn("not valid JSON", message)
+
+
+class LoadRebrandMapNamedRefusalTests(unittest.TestCase):
+    """D13: loading `rebrand.json` must refuse the same way `load_pin` does -- today `build()`
+    reads it inline with no wrapping at all. Fixed by extracting `load_rebrand_map`, used by
+    `build()` in place of the inline read."""
+
+    def setUp(self) -> None:
+        self.work_dir = Path(tempfile.mkdtemp(dir="/dev/shm", prefix="darq-load-rebrand-"))
+        self.addCleanup(shutil.rmtree, self.work_dir, ignore_errors=True)
+
+    def test_unreadable_file_names_the_path_and_the_reason(self) -> None:
+        path = self.work_dir / "rebrand.json"
+        path.write_text("{}", encoding="utf-8")
+        os.chmod(path, 0o000)
+        self.addCleanup(os.chmod, path, 0o644)
+
+        with self.assertRaises(build_darq.BuildError) as ctx:
+            build_darq.load_rebrand_map(path)
+
+        message = str(ctx.exception)
+        self.assertIn(str(path), message)
+        self.assertIn("Permission denied", message)
+
+    def test_malformed_json_names_the_path_and_the_reason(self) -> None:
+        path = self.work_dir / "rebrand.json"
+        path.write_text("not json at all", encoding="utf-8")
+
+        with self.assertRaises(build_darq.BuildError) as ctx:
+            build_darq.load_rebrand_map(path)
+
+        message = str(ctx.exception)
+        self.assertIn(str(path), message)
+        self.assertIn("not valid JSON", message)
+
+
+class ChecksumSidecarNamedRefusalTests(unittest.TestCase):
+    """D13: writing and reading a `.sha256` sidecar must both refuse by naming the file and the
+    reason. `write_checksum_sidecar` is the fix for the write (`run_build_installer`);
+    `read_checksum_sidecar` is the fix for the two reads at the end of `build()`."""
+
+    def setUp(self) -> None:
+        self.work_dir = Path(tempfile.mkdtemp(dir="/dev/shm", prefix="darq-checksum-"))
+        self.addCleanup(shutil.rmtree, self.work_dir, ignore_errors=True)
+
+    def test_write_target_that_is_a_directory_is_a_named_refusal(self) -> None:
+        out = self.work_dir / "install.sh"
+        out.write_text("#!/bin/sh\n", encoding="utf-8")
+        checksum_path = self.work_dir / "install.sh.sha256"
+        checksum_path.mkdir()
+
+        with self.assertRaises(build_darq.BuildError) as ctx:
+            build_darq.write_checksum_sidecar(out, "deadbeef", "install.sh")
+
+        message = str(ctx.exception)
+        self.assertIn(str(checksum_path), message)
+        self.assertIn("Is a directory", message)
+
+    def test_missing_sidecar_read_is_a_named_refusal(self) -> None:
+        missing = self.work_dir / "darq.sha256"
+
+        with self.assertRaises(build_darq.BuildError) as ctx:
+            build_darq.read_checksum_sidecar(missing, artifact_name="darq")
+
+        message = str(ctx.exception)
+        self.assertIn(str(missing), message)
+        self.assertIn("No such file or directory", message)
+
+    def test_unreadable_sidecar_read_is_a_named_refusal(self) -> None:
+        path = self.work_dir / "install.sh.sha256"
+        path.write_text("abc  install.sh\n", encoding="utf-8")
+        os.chmod(path, 0o000)
+        self.addCleanup(os.chmod, path, 0o644)
+
+        with self.assertRaises(build_darq.BuildError) as ctx:
+            build_darq.read_checksum_sidecar(path, artifact_name="install.sh")
+
+        message = str(ctx.exception)
+        self.assertIn(str(path), message)
+        self.assertIn("Permission denied", message)
+
+
+class ExtractPegasusPackageNamedRefusalTests(unittest.TestCase):
+    """D13: `archive.extractall` inside `extract_pegasus_package` must refuse by naming the
+    zipapp, the destination and the reason instead of a bare traceback."""
+
+    def setUp(self) -> None:
+        self.work_root = Path(tempfile.mkdtemp(dir="/dev/shm", prefix="darq-extract-refusal-"))
+        self.addCleanup(shutil.rmtree, self.work_root, ignore_errors=True)
+
+    def test_unwritable_work_dir_is_a_named_refusal(self) -> None:
+        pegasus_binary = self.work_root / "pegasus"
+        with zipfile.ZipFile(pegasus_binary, "w") as archive:
+            archive.writestr("pegasus/__main__.py", "print(1)\n")
+        work_dir = self.work_root / "work"
+        work_dir.mkdir()
+        os.chmod(work_dir, 0o500)
+        self.addCleanup(os.chmod, work_dir, 0o700)
+
+        with self.assertRaises(build_darq.BuildError) as ctx:
+            build_darq.extract_pegasus_package(pegasus_binary, work_dir)
+
+        message = str(ctx.exception)
+        self.assertIn(str(pegasus_binary), message)
+        self.assertIn(str(work_dir / "extracted"), message)
+        self.assertIn("Permission denied", message)
+
+
+class PersistRawContentCopyNamedRefusalTests(unittest.TestCase):
+    """D13: `shutil.copytree` inside `persist_raw_content_copy` must refuse by naming the source,
+    the destination and the reason instead of a bare `shutil.Error` traceback."""
+
+    def setUp(self) -> None:
+        self.work_root = Path(tempfile.mkdtemp(dir="/dev/shm", prefix="darq-persist-refusal-"))
+        self.addCleanup(shutil.rmtree, self.work_root, ignore_errors=True)
+
+    def test_unreadable_source_file_is_a_named_refusal(self) -> None:
+        content_root = self.work_root / "extracted" / "pegasus" / "content"
+        content_root.mkdir(parents=True)
+        blocked = content_root / "blocked.md"
+        blocked.write_text("secret\n", encoding="utf-8")
+        os.chmod(blocked, 0o000)
+        self.addCleanup(os.chmod, blocked, 0o644)
+        raw_dir = self.work_root / "extracted-raw" / "content"
+
+        with self.assertRaises(build_darq.BuildError) as ctx:
+            build_darq.persist_raw_content_copy(content_root, raw_dir)
+
+        message = str(ctx.exception)
+        self.assertIn(str(content_root), message)
+        self.assertIn(str(raw_dir), message)
+        self.assertIn("Permission denied", message)
 
 
 if __name__ == "__main__":

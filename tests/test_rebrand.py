@@ -6,16 +6,19 @@ tree under a temporary directory. Everything else exercises the pure string func
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import tempfile
 import unittest
 from pathlib import Path
 
 from rebrand.transform import (
+    RebrandIOError,
     RebrandMap,
     RebrandPathError,
     apply_to_tree,
     is_excluded,
+    load_map,
     mask,
     parse_map,
     rename_relative_path,
@@ -396,6 +399,111 @@ class RebrandTransformTests(unittest.TestCase):
             lockfile.read_text(encoding="utf-8"),
             '{"packages": {"": {"name": "pegasus-playwright-mcp"}}}\n',
         )
+
+
+class LoadMapNamedRefusalTests(unittest.TestCase):
+    """D13: `load_map`'s one read must refuse by naming the file and the reason, never surface a
+    bare traceback. Reached here directly, since nothing in the build pipeline calls `load_map`
+    today (`tools.build_darq.build` reads `rebrand.json` itself, see
+    `BuildDarqLoadRebrandMapTests`) -- but it is real, callable I/O with no wrapping until fixed.
+    """
+
+    def setUp(self) -> None:
+        self.work_dir = Path(tempfile.mkdtemp(dir="/dev/shm", prefix="darq-rebrand-loadmap-"))
+        self.addCleanup(shutil.rmtree, self.work_dir, ignore_errors=True)
+
+    def test_unreadable_file_names_the_path_and_the_reason(self) -> None:
+        path = self.work_dir / "rebrand.json"
+        path.write_text("{}", encoding="utf-8")
+        os.chmod(path, 0o000)
+        self.addCleanup(os.chmod, path, 0o644)
+
+        with self.assertRaises(RebrandIOError) as ctx:
+            load_map(path)
+
+        message = str(ctx.exception)
+        self.assertIn(str(path), message)
+        self.assertIn("Permission denied", message)
+
+
+class ApplyToTreeNamedRefusalTests(unittest.TestCase):
+    """D13: every read/write/unlink/rename `apply_to_tree` performs must refuse by naming the
+    file and the reason on failure, instead of letting a bare `OSError` traceback surface."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.rebrand_map = parse_map(json.loads(REBRAND_JSON.read_text(encoding="utf-8")))
+
+    def setUp(self) -> None:
+        self.content_root = Path(tempfile.mkdtemp(dir="/dev/shm", prefix="darq-apply-refusal-"))
+        self.addCleanup(shutil.rmtree, self.content_root, ignore_errors=True)
+
+    def test_unreadable_source_file_is_a_named_refusal(self) -> None:
+        source = self.content_root / "agents" / "pegasus-orchestrator.md"
+        source.parent.mkdir(parents=True)
+        source.write_text("pegasus body\n", encoding="utf-8")
+        os.chmod(source, 0o000)
+        self.addCleanup(os.chmod, source, 0o644)
+
+        with self.assertRaises(RebrandIOError) as ctx:
+            apply_to_tree(self.content_root, self.rebrand_map)
+
+        message = str(ctx.exception)
+        self.assertIn(str(source), message)
+        self.assertIn("Permission denied", message)
+
+    def test_write_target_that_is_a_directory_is_a_named_refusal(self) -> None:
+        # `agents/pegasus-orchestrator.md` renames+substitutes to `agents/darq-orchestrator.md`
+        # for free (mechanical derivation, no explicit rename entry needed). Pre-creating the
+        # target as a directory forces `target_path.write_text` to fail with IsADirectoryError.
+        source = self.content_root / "agents" / "pegasus-orchestrator.md"
+        source.parent.mkdir(parents=True)
+        source.write_text("pegasus body\n", encoding="utf-8")
+        target = self.content_root / "agents" / "darq-orchestrator.md"
+        target.mkdir()
+
+        with self.assertRaises(RebrandIOError) as ctx:
+            apply_to_tree(self.content_root, self.rebrand_map)
+
+        message = str(ctx.exception)
+        self.assertIn(str(target), message)
+        self.assertIn("Is a directory", message)
+
+    def test_unremovable_old_path_is_a_named_refusal(self) -> None:
+        # `path.unlink()` (the rename+substitute branch) needs write permission on the *parent
+        # directory*, not on the file itself -- read_text only needs read+search, so a
+        # read-only-but-not-writable `agents/` lets the read through and fails exactly at unlink.
+        source = self.content_root / "agents" / "pegasus-orchestrator.md"
+        source.parent.mkdir(parents=True)
+        source.write_text("pegasus body\n", encoding="utf-8")
+        os.chmod(source.parent, 0o500)
+        self.addCleanup(os.chmod, source.parent, 0o700)
+
+        with self.assertRaises(RebrandIOError) as ctx:
+            apply_to_tree(self.content_root, self.rebrand_map)
+
+        message = str(ctx.exception)
+        self.assertIn(str(source), message)
+        self.assertIn("Permission denied", message)
+
+    def test_unreplaceable_rename_only_path_is_a_named_refusal(self) -> None:
+        # A file whose extension is outside `substitution_extensions` (`.md`/`.txt`) never has
+        # its body substituted, but its path is still mechanically renamed if it carries the
+        # brand -- that is the `elif target_path != path: ... path.replace(target_path)` branch.
+        # `path.replace` needs write permission on the directory holding both the old and new
+        # names; a read-only `images/` reaches that exact failure.
+        source = self.content_root / "images" / "pegasus-logo.png"
+        source.parent.mkdir(parents=True)
+        source.write_bytes(b"binary content")
+        os.chmod(source.parent, 0o500)
+        self.addCleanup(os.chmod, source.parent, 0o700)
+
+        with self.assertRaises(RebrandIOError) as ctx:
+            apply_to_tree(self.content_root, self.rebrand_map)
+
+        message = str(ctx.exception)
+        self.assertIn(str(source), message)
+        self.assertIn("Permission denied", message)
 
 
 if __name__ == "__main__":
