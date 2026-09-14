@@ -11,19 +11,26 @@ DARQ existe para ser, exactamente, el lugar donde ese mismo contenido sí perten
 | | Pegasus | DARQ |
 |---|---|---|
 | Para quién | Cualquier equipo, cualquier organización | La DGISIS y sus GO |
-| Qué rechaza | Política interna de una organización particular | Contenido genérico que no es específico de la DGISIS |
-| Qué acepta | Guía genérica, reusable fuera de esta organización | Estándares y skills propios de la DGISIS |
+| Qué rechaza | Política interna de una organización particular | Contenido genérico cuya casa natural sigue siendo el motor |
+| Qué acepta | Guía genérica, reusable fuera de esta organización | Lo propio de la DGISIS, y lo que el motor dejó afuera por alcance |
 
 Lo que Pegasus retira por ser demasiado específico es, con el mismo criterio y sin ninguna contradicción, lo que DARQ existe para incluir.
 
 ## Qué califica como contenido institucional para la DGISIS
 
-- Estándares de tecnología propios de la organización (el caso fundacional: el estándar de versiones ASI).
-- Skills de seguridad u operación específicos de cómo trabaja la DGISIS (el caso fundacional: seguridad Laravel).
-- Skills de operación de infraestructura propia de una GO (el caso en curso: operar OpenShift vía `oc`, aportado por la GO de implementaciones).
-- Cualquier contenido futuro con el mismo perfil: útil puertas adentro de la DGISIS, y sin sentido genérico fuera de ella.
+DARQ acepta dos cosas distintas, y hay que nombrarlas por separado porque no entran por el mismo motivo. Presentarlas como una sola es lo que volvía este documento contradictorio consigo mismo.
 
-Lo que no cumple esa condición no entra, sin importar cuánto valor tenga — si es genérico, su lugar es Pegasus, no DARQ.
+**Lo propio de la DGISIS.** Específico de la organización: fuera de ella no tiene sentido.
+
+- Estándares de tecnología propios (el caso fundacional: el estándar de versiones ASI).
+- Skills de operación de infraestructura propia de una GO (el caso en curso: operar OpenShift vía `oc`, aportado por la GO de implementaciones).
+- Cualquier contenido futuro con ese perfil: útil puertas adentro, y sin sentido genérico fuera.
+
+**Lo que el motor decidió no embarcar, y que la DGISIS sostiene para sus equipos.** Acá la especificidad no está en el contenido: está en la decisión. Pegasus lo retiró de su release público por alcance —no por calidad ni por secreto— y alguien tiene que seguir manteniéndolo para quienes lo usan. Ese alguien es la DGISIS.
+
+- Seguridad Laravel es exactamente este caso, y conviene decirlo con todas las letras: **es guía genérica**, aplicable a cualquier equipo que use el framework, y lo único propio de la organización que tiene es su `author`. No entra por ser específica. Entra porque el producto público la dejó afuera y acá hay equipos que trabajan con Laravel. Durante un tiempo este documento la presentó como «específica de cómo trabaja la DGISIS», que no era cierto: convertía al caso fundacional en el contraejemplo del criterio que el mismo documento declara dos secciones más abajo.
+
+La prueba para lo que **no** entra es de una sola pregunta: ¿alguien fuera de la DGISIS lo querría, y el producto público está dispuesto a distribuirlo? Si las dos respuestas son sí, su casa es el motor y no DARQ. Un «sí» y un «no» —lo quieren afuera pero el motor no lo embarca— es justamente la segunda categoría de arriba.
 
 ## La forma es no negociable: skill seleccionado por relevancia, nunca regla hardcodeada
 
@@ -44,7 +51,7 @@ Todo contenido que entra a DARQ trae su procedencia — de qué GO o equipo vien
 - Nada que sea competencia o superposición con lo que ya presenta la dirección ejecutiva ("ASI Harness") — DARQ es la distribución de la DGISIS, no una alternativa a esa iniciativa (ver `docs/adr/0003-no-se-llama-harness.md`).
 - Nada específico de otras áreas fuera de la DGISIS y sus GO — el harness que está construyendo el equipo de Rocío (GO de proyectos) para otras áreas es un esfuerzo separado, con su propio criterio de inclusión.
 - Ninguna capacidad de motor nueva ni ningún fork de código de Pegasus — eso es exactamente lo que la ADR 0001 cierra.
-- Contenido genérico sin especificidad institucional — ese contenido pertenece en Pegasus, no en DARQ.
+- Contenido genérico cuya casa natural sigue siendo el motor: si Pegasus lo embarca, o lo embarcaría, su lugar es Pegasus. Lo que el motor retiró por alcance es otra cosa y sí entra — ver «Qué califica como contenido institucional».
 - Contenido sin owner nombrado.
 
 ## El residuo de marca conocido, y por qué es deliberado
