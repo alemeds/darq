@@ -1,6 +1,6 @@
 # Manual de uso: DARQ + OpenCode
 
-Este manual describe cómo usar DARQ 7 una vez instalado: qué decide, qué preserva de tu cuenta y cómo se trabaja el día a día con OpenCode. Para instalarlo no hay procedimiento acá — está en [INSTALL.md](INSTALL.md) (manual) y en [INSTALL_BY_AGENT.md](INSTALL_BY_AGENT.md) (asistido por un agente).
+Este manual describe cómo usar DARQ 7 una vez instalado: qué decide, qué preserva de tu cuenta y cómo se trabaja el día a día con OpenCode. Para instalarlo no hay procedimiento acá — está en [INSTALL.md](INSTALL.md) (manual) y en [INSTALL_BY_AGENT.md](INSTALL_BY_AGENT.md) (asistido por un agente). Si tu CLI es Claude Code, el manual equivalente es [MANUAL-claude-code.md](MANUAL-claude-code.md).
 
 ## Qué es DARQ en esta versión
 
