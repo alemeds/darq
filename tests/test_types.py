@@ -139,7 +139,7 @@ class CapabilityManifestTest(unittest.TestCase):
 
 
 class DirectoryGrantBehaviorTest(unittest.TestCase):
-    """The CLI-agnostic facts `pegasus directory grant`'s report is built
+    """The CLI-agnostic facts `darq directory grant`'s report is built
     from: whether this CLI already allows external directories by default
     (so a grant changes nothing today regardless), whether granting one
     still writes a rule of its own into the rendered configuration, and

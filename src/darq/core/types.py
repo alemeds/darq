@@ -155,7 +155,7 @@ class CapabilityManifest:
 
 @dataclass(frozen=True)
 class DirectoryGrantBehavior:
-    """What `pegasus directory grant` actually does on one CLI -- the same
+    """What `darq directory grant` actually does on one CLI -- the same
     idea `CapabilityManifest.reasons` already models for a missing
     capability, applied to a different fact this port needs from every
     adapter: not "does this CLI have the concept", but "what does granting
@@ -204,7 +204,7 @@ class DirectoryGrantBehavior:
 
 @dataclass(frozen=True)
 class McpGrantBehavior:
-    """What `pegasus mcp grant`/`mcp revoke` actually do to one CLI's own
+    """What `darq mcp grant`/`mcp revoke` actually do to one CLI's own
     rendered configuration for a self-administered (bound) server key --
     the same idea `DirectoryGrantBehavior` already models for a granted
     directory, applied to a different fact this port needs from every

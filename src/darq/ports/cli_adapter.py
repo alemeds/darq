@@ -261,7 +261,7 @@ class CliAdapter(Protocol):
         """
 
     def directory_grant_behavior(self) -> DirectoryGrantBehavior:
-        """What `pegasus directory grant` actually does on this CLI, today.
+        """What `darq directory grant` actually does on this CLI, today.
 
         Not gated behind any `Capability`: unlike an MCP grant or a
         per-agent model, granting a working directory is a fact every
@@ -286,7 +286,7 @@ class CliAdapter(Protocol):
         """
 
     def mcp_grant_behavior(self) -> McpGrantBehavior:
-        """What `pegasus mcp grant`/`mcp revoke` actually do to this CLI's
+        """What `darq mcp grant`/`mcp revoke` actually do to this CLI's
         own rendered configuration for a self-administered (bound) server
         key, today.
 

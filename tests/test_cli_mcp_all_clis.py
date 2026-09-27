@@ -67,7 +67,7 @@ class RealHomeTestCase(_RealHomeTestCase):
 
     def declare_own_mcp_server(self, cli_id: str, key: str) -> None:
         """What a user administering their own MCP server leaves behind in
-        the CLI's own configuration -- a key under `/mcp` Pegasus never
+        the CLI's own configuration -- a key under `/mcp` DARQ never
         wrote. Mirrors `test_cli_mcp.py`'s own fixture; `_declared_mcp_keys`
         reads this same shape off `layout.settings_file` for every adapter."""
         layout = self.layout(cli_id)

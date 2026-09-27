@@ -215,7 +215,7 @@ def _check_own_artifacts(adapter: object, cli_id: str, layout: Layout) -> None:
 
 
 def _check_directory_grant_behavior(adapter: object, cli_id: str) -> None:
-    """Confirm the adapter can state what `pegasus directory grant` actually
+    """Confirm the adapter can state what `darq directory grant` actually
     does on its own CLI, as a `DirectoryGrantBehavior` -- unconditionally,
     not gated on any `Capability`, the same way `own_artifacts` is required
     of every adapter: `content.grant_directories` already applies to every
@@ -241,7 +241,7 @@ def _check_directory_grant_behavior(adapter: object, cli_id: str) -> None:
 
 
 def _check_mcp_grant_behavior(adapter: object, cli_id: str) -> None:
-    """Confirm the adapter can state what `pegasus mcp grant` actually does
+    """Confirm the adapter can state what `darq mcp grant` actually does
     to its own rendered configuration, as an `McpGrantBehavior` --
     unconditionally, the same way `_check_directory_grant_behavior` is
     required of every adapter regardless of `Capability.MCP`.

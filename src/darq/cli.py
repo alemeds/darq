@@ -4329,7 +4329,7 @@ def _directory_prose(report: dict[str, Any]) -> str:
     surfaces no directory grant screen of its own, so this is the only place
     this wording is ever produced.
 
-    Every CLI Pegasus ships today already allows external directories by
+    Every CLI DARQ ships today already allows external directories by
     default (`report["allowed_by_default"]`, set by `directory_grant` from
     `CliAdapter.directory_grant_behavior()`), so a grant changes nothing on
     either of them, and the wording says so honestly rather than claiming an
