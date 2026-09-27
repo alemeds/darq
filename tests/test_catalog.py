@@ -582,7 +582,14 @@ class ShippedCatalogTest(unittest.TestCase):
         # lazy-loaded file and, like the rest of that home, no config entry.
         # Upstream counts it as "99, not 98", without this fork's five
         # institutional files; this fork's figure is its own tree's.
-        self.assertEqual((len(files), len(keys)), (104, 27))
+        # 105 and 106, not 104: credential transport ships two new files,
+        # both gated on `credential_transport().any` -- the plugin itself
+        # (`secret-transport.ts`) and its sidecar data file (the detection
+        # catalog, copied verbatim from the content core). Neither writes a
+        # settings key: the plugin is discovered as a file under `plugin/`,
+        # the same as every other one, and the sidecar is a plain file the
+        # plugin reads at runtime, not an OpenCode setting.
+        self.assertEqual((len(files), len(keys)), (106, 27))
 
     def test_every_target_is_relative(self):
         for entry in self.catalog.entries:

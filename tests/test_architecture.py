@@ -793,6 +793,17 @@ def bundled_runtime_assets() -> list[Path]:
 #: - `adapters/opencode/assets/plugins/zellij-state.ts` addresses a state
 #:   directory whose engine-branded name is shared with tooling outside this
 #:   repository; the asset says so itself.
+#: - `adapters/opencode/assets/plugins/secret-transport.ts` (7.3.0, transported
+#:   from Pegasus and localized: see `docs/transporte-desde-pegasus.md`'s
+#:   credential-transport decision) reads and writes the env var name
+#:   `DARQ_SECRET_<NAME>`, this fork's own localization of upstream's
+#:   `PEGASUS_SECRET_<NAME>` rather than a kept wire-format literal -- unlike
+#:   `PEGASUS_SKILL_REGISTRY_BIN`/`PEGASUS_SKILL_ROOTS` above, there is no
+#:   installed base yet to orphan by naming it after this fork. It still
+#:   carries this fork's own brand fragment (`fragments()`'s identity-derived
+#:   half, not `BANNED_FRAGMENTS`), which is exactly what it must do: a
+#:   variable name the model itself sees and a shell expands has to say the
+#:   name this fork actually installed it under.
 #:
 #: Listed here, and nowhere else, so that adding a new asset can never quietly
 #: join them: a `.ts` that ships a brand fragment without appearing here, at
@@ -801,6 +812,7 @@ BRAND_EXEMPT_RUNTIME_ASSETS = frozenset(
     {
         "adapters/opencode/assets/plugins/skill-registry.ts",
         "adapters/opencode/assets/plugins/zellij-state.ts",
+        "adapters/opencode/assets/plugins/secret-transport.ts",
     }
 )
 
@@ -985,6 +997,14 @@ def _brand_offenders(path: Path, fragments: tuple[str, ...]) -> list[str]:
 #:   it in its own protected tokens, and deriving it from `identity.json`
 #:   would make it diverge between distributions without anyone reading it.
 #:
+#: `adapters/opencode/assets/plugins/secret-transport.ts` (7.3.0, transported
+#: from Pegasus and localized) reads and writes the wire-format variable name
+#: `DARQ_SECRET_<NAME>` -- this fork's own name, not upstream's, for the same
+#: reason `BRAND_EXEMPT_RUNTIME_ASSETS` above exempts it: there is no
+#: installed base yet under the old name to keep speaking to, so the fork's
+#: own brand fragment belongs in the wire format here, the same way the
+#: skill-registry env vars carry Pegasus's.
+#:
 #: Listed here, and nowhere else, so a new asset can never quietly join them:
 #: one that ships a brand fragment without appearing here, at this exact
 #: path, fails the scan.
@@ -993,6 +1013,7 @@ VERBATIM_ASSET_BRAND_EXEMPTIONS = frozenset(
         "adapters/opencode/assets/plugins/skill-registry.ts",
         "adapters/opencode/assets/plugins/zellij-state.ts",
         "adapters/opencode/assets/registry/assets.json",
+        "adapters/opencode/assets/plugins/secret-transport.ts",
     }
 )
 

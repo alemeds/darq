@@ -28,13 +28,14 @@ El release incluye solamente lo siguiente:
 
 1. Todos los commands, el registro de skills y los assets del registro.
 2. Los cinco servidores MCP que el contenido embarca (`src/darq/content/mcp/`), cada uno con su forma de distribucion declarada en el descriptor: `cbm` y `engram` (`download`: binario de release con version y `sha256` fijos), `playwright` (`npm`: tarball del registry con `integrity` y su propio `package-lock.json`), y `context7` y `jira` (`remote`: un endpoint HTTPS, sin nada que descargar ni materializar). Ninguno se instala si no se lo nombra con `--mcp`.
-3. Los seis plugins locales aprobados (`src/darq/adapters/opencode/assets/plugins/`). Cuatro se instalan con el prefijo del binario — `darq` en esta distribución — y dos conservan su nombre de origen:
+3. Los siete plugins locales aprobados (`src/darq/adapters/opencode/assets/plugins/`). Cinco se instalan con el prefijo del binario — `darq` en esta distribución — y dos conservan su nombre de origen:
    - `engram.ts`, sin prefijo.
    - `zellij-status.js`, sin prefijo.
    - `zellij-state.ts` → `pegasus-zellij-state.ts`, el estado de Zellij.
    - `skill-registry.ts` → `darq-skill-registry.ts`, el plugin de registro (acompañado de `darq-skill-registry.env`).
    - `apply-patch-scope.ts` → `darq-apply-patch-scope.ts`, que agrega un párrafo a la descripción de `apply_patch` para que su imperativo de apertura no se lea como una prohibición del resto de las herramientas.
    - `orchestrator-notifier.ts` → `darq-orchestrator-notifier.ts`, que avisa por `notify-send` cuando la sesión del orquestador queda `idle` o bloqueada esperando un permiso.
+   - `secret-transport.ts` → `darq-secret-transport.ts`, el transporte de credenciales: detecta un valor sensible por contexto o por el fallback explícito `<private>`, lo sustituye por una variable antes de que el mensaje se persista, la expone al ejecutar comandos y la redacta de la salida de una tool. Se instala sólo si el adapter declara al menos una operación de `credential_transport()` (ver `arquitectura.md`), acompañado de su propio sidecar de datos, `darq-secret-transport-catalog.json` — el catálogo de detección, copiado sin cambios desde el content core.
 
    El notifier externo `@mohak34/opencode-notifier@0.2.4` se fija con su `package-lock.json` y se instala solo con `npm ci --ignore-scripts` durante la aceptación aislada.
 4. Skills (`src/darq/content/skills/`, veintiséis en total; `_shared/` no cuenta -- no es una skill invocable, es la biblioteca de fragmentos que las demás cargan):
