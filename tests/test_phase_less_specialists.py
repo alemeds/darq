@@ -363,10 +363,10 @@ class RenderedPermissionTest(unittest.TestCase):
         explorer = self.rendered("darq-explorer")
         self.assertEqual(resolve(explorer["permission"], "read"), "allow")
         self.assertEqual(resolve(explorer["permission"], "grep"), "allow")
-        self.assertEqual(resolve(explorer["permission"], "bash"), "allow")
+        self.assertEqual(resolve(explorer["permission"], "bash")["*"], "allow")
         verifier = self.rendered("darq-verifier")
         self.assertEqual(resolve(verifier["permission"], "read"), "allow")
-        self.assertEqual(resolve(verifier["permission"], "bash"), "allow")
+        self.assertEqual(resolve(verifier["permission"], "bash")["*"], "allow")
 
     def test_the_implementer_can_write(self):
         value = self.rendered("darq-implementer")
