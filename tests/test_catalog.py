@@ -682,7 +682,12 @@ class ShippedCatalogTest(unittest.TestCase):
         # settings key: the plugin is discovered as a file under `plugin/`,
         # the same as every other one, and the sidecar is a plain file the
         # plugin reads at runtime, not an OpenCode setting.
-        self.assertEqual((len(files), len(keys)), (106, 27))
+        # 107, not 106: `_shared/parallel-delivery.md` says how a coordinator
+        # delivers several independent units at once -- partition, worktrees,
+        # integration, its own suite run, review. Read only through the one
+        # pointer in the criterion file's "Writers in parallel", so it is one
+        # more lazy-loaded file and no config entry.
+        self.assertEqual((len(files), len(keys)), (107, 27))
 
     def test_every_target_is_relative(self):
         for entry in self.catalog.entries:
