@@ -2141,7 +2141,7 @@ El diagnóstico tenía dos partes independientes, y las dos hacían falta para q
 
   El 27 de septiembre de 2026 el usuario decidió empezar a prepararse para esa versión. Lo que rompería hoy en DARQ, **leído del código y no corrido**:
   - los plugins necesitan un export por defecto `{id, setup}`;
-  - `instructions` no se resuelve, así que `pegasus-AGENTS.md` quedaría inerte;
+  - `instructions` no se resuelve, así que `darq-AGENTS.md` quedaría inerte;
   - MCP en modo Code Mode es el default, y DARQ deniega `execute`;
   - cambió la forma de la salida de la tool de sub-agentes;
   - `subagent_depth` pasó a `experimental.subagent_depth`, con default 1;

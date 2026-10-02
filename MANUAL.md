@@ -185,7 +185,7 @@ Por cada servidor que este flag arranca informa uno de estos estados: `ok` (cont
 
 Si en la misma máquina tenés también Claude Code, OpenCode puede leer archivos que no son de DARQ ni suyos. Está verificado en el código de OpenCode (v1.18.32):
 
-- Como instrucciones globales usa `~/.config/opencode/AGENTS.md`; si ese archivo no existe, usa `~/.claude/CLAUDE.md`, el de Claude Code. DARQ no instala un `AGENTS.md` global a propósito (el suyo es `pegasus-AGENTS.md`, que carga por `instructions`), así que en esa máquina el orquestador de DARQ puede obedecer, sin avisar, reglas escritas para otra CLI.
+- Como instrucciones globales usa `~/.config/opencode/AGENTS.md`; si ese archivo no existe, usa `~/.claude/CLAUDE.md`, el de Claude Code. DARQ no instala un `AGENTS.md` global a propósito (el suyo es `darq-AGENTS.md`, que carga por `instructions`), así que en esa máquina el orquestador de DARQ puede obedecer, sin avisar, reglas escritas para otra CLI.
 - Siempre recorre `~/.claude/skills/**/SKILL.md` y suma esas skills a las suyas. Si una skill de DARQ tiene el mismo nombre que una de ellas, gana la de DARQ; el resto se agrega.
 
 `darq doctor` lo dice cuando corresponde, y `install` y `update` repiten el mismo aviso una vez: nombra el archivo, cuántas skills son y la variable de entorno que lo apaga. Sólo mira que existan y cuántas son; nunca abre su contenido. Las variables son estas:

@@ -325,7 +325,7 @@ class Adapter:
         - `session/instruction.ts`: global instructions are
           `~/.config/opencode/AGENTS.md`; when that file does not exist it
           falls back to `~/.claude/CLAUDE.md`. DARQ deliberately ships no
-          global `AGENTS.md` (its own is `pegasus-AGENTS.md`, loaded through
+          global `AGENTS.md` (its own is `darq-AGENTS.md`, loaded through
           `instructions`), so on a machine that also has Claude Code the
           fallback is taken.
         - `skill/index.ts`: `~/.claude/skills/**/SKILL.md` is always scanned,
