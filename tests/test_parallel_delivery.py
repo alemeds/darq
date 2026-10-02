@@ -347,6 +347,7 @@ class PinnedClausesTest(ProcedureCase):
     def test_the_worktree_path_is_outside_the_repository_and_names_no_product(self):
         self.assertTrue(WORKTREE_PATH.startswith("`<state>/agent-worktrees/"))
         self.assertNotIn("pegasus", self.flat.lower())
+        self.assertNotIn("darq", self.flat.lower())
         self.assertNotIn("opencode", self.flat.lower())
         self.assertNotIn("claude", self.flat.lower())
 
