@@ -95,6 +95,37 @@ de la tabla de arriba tal cual). Ningún otro archivo de `docs/` necesitó exenc
 `test_scanning_docs_needs_only_the_runbooks_own_exemption` lo mide, no lo asume, y se pone en rojo
 el día en que un segundo archivo la necesite.
 
+**Una exención no es el archivo: son sus ocurrencias.** Esos dos archivos se siguen saltando en el
+recorrido general, pero `ExemptionAllowlistTest` corre sobre ellos los mismos cuatro patrones y exige
+que el resultado sea **igual** a `EXEMPT_OCCURRENCES`: una tabla de `(patrón, texto que matchea)` →
+cuántas veces. Falla en las dos direcciones. Si el archivo gana un nombre de upstream sin localizar
+(aunque sea uno que ya figura, una vez de más), el test lo informa como `added`; si una ocurrencia
+permitida desaparece, lo informa como `vanished`, así que la lista no puede pudrirse. Una permuta que
+deja el conteo igual —cambiar un nombre por otro— también falla, porque la clave es el texto. No lleva
+números de línea, de modo que editar alrededor de una línea permitida no la rompe. El precio de no
+llevarlos es un caso que no ve: borrar una ocurrencia permitida y, en la misma edición, agregar otra
+con el mismo texto en otro lugar —por ejemplo, cambiar una cita narrada por un import real— deja el
+conteo igual y el test en verde. **Si tocás uno de esos dos archivos y el test se pone en rojo**: si agregaste una cita
+deliberada, sumala a `EXEMPT_OCCURRENCES`; si borraste una, sacala de la tabla; si es un nombre sin
+localizar de verdad, localizalo.
+
+**Un id de wire versionado no es una ruta.** La rama de `UPSTREAM_PATH_STRING` que reconoce
+`pegasus/<subdirectorio>` deriva los subdirectorios de `src/darq/`, así que una familia de esquemas
+congelada que casualmente se llame como un paquete —`pegasus/core/v1`, `pegasus/ports/v2`— se
+marcaba como ruta de código. Ahora no: la forma `pegasus/<palabra>/v<dígitos>` queda fuera, y sólo
+ella. Una ruta que arranca parecido sigue marcada: `pegasus/core/v1.py`, `pegasus/core/v1/`,
+`pegasus/core/v1x`. La rama `src/pegasus` no tiene esta salvedad, porque un prefijo `src/` nunca es
+un id de esquema.
+
+**La prosa que nombra una ruta sigue marcada, y es una decisión.** Las otras dos salidas —leer sólo
+destinos de enlace y code spans— exigirían parsear Markdown, y un hallazgo que depende de si la
+ruta está entre acentos graves falla abierto justo en la prosa que un lector va a seguir. Se prefirió
+fallar cerrado: en un `.md`, una ruta de un subdirectorio real de `src/darq` precedida de `pegasus/`
+se marca aunque sea una mención histórica. Para escribir esa mención sin disparar el guardián,
+nombrala sin la forma de ruta (el paquete `core` del motor de origen, por ejemplo), o escribí la
+ruta de este fork, `src/darq/core`. Si de verdad hay que citar la forma de upstream, hace falta una
+entrada en `EXEMPT_OCCURRENCES`, con su razón, y eso sólo se justifica en este documento.
+
 Un release grande y con mucha prosa de Pegasus, el tipo que agrega archivos nuevos de agentes o
 skills en vez de tocar código, es exactamente el caso que más le pega a la forma del nombre de
 agente: un archivo nuevo de upstream que nombra `pegasus-orchestrator` en su propia prosa, o que se
@@ -113,6 +144,17 @@ archivo que no existía— y antes de este guardián no había nada que lo mirar
   que un sexto agente genérico de upstream (`pegasus-scribe`, digamos) entra sin que nada lo vea
   hasta el día en que este fork cree `darq-scribe` — a partir de ahí la derivación lo agarra solo.
   Medido en `NoUpstreamAgentNameTest.test_a_wholly_new_upstream_agent_role_is_not_caught`.
+
+- Un `pegasus/<subdirectorio>/v<dígitos>` escrito como ruta de verdad: la rama de la ruta lo toma
+  por un id de wire y lo deja pasar. No existe ningún archivo del árbol llamado `v1`, y un
+  directorio con ese nombre exigiría el `/` final, que sí se marca; medido en
+  `NoUpstreamPathStringTest.test_a_real_path_that_starts_like_a_version_is_still_flagged`.
+- Un `os.path.join(` o `.joinpath(` que nunca cierra, repetido miles de veces en un mismo archivo:
+  `SPLIT_UPSTREAM_PATH_SEGMENT` busca el `)` desde cada apertura, así que esa entrada artificial es
+  cuadrática: con 256 KB se midieron entre 30 s y casi 3 minutos, según la carga de la máquina. Ningún
+archivo real tiene esa forma; se anota para que
+  quien toque el patrón no lo dé por lineal. Con aperturas cerradas, 16 MB cuestan entre 1 y 3,5 s
+  por patrón.
 
 Lo único que sigue sin verse por decisión, no por hueco, es la prosa que nombra el producto
 ("Pegasus hace X"): es una decisión editorial, no un defecto de transporte, así que este guardián

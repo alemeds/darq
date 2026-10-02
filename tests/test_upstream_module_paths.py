@@ -67,6 +67,12 @@ so none of them needs an exemption for it. Prose that merely names the
 upstream product does not match either; that remains a separate concern this
 gate does not judge.
 
+Two properties keep the gate honest about itself. A versioned wire id
+(`pegasus/<word>/v<digits>`) is not a path, however its middle word is spelled
+(see `UPSTREAM_PATH_STRING`). And an exemption is a list of occurrences, not a
+file: `EXEMPT_OCCURRENCES` pins what each exempt file may still say and fails
+when it gains one or loses one (`ExemptionAllowlistTest`).
+
 Two forms of split still escape, on purpose rather than by oversight, and
 are measured in `test_a_nested_call_is_not_caught` and
 `test_a_wholly_new_upstream_agent_role_is_not_caught`: a `"pegasus"`
@@ -81,6 +87,7 @@ from __future__ import annotations
 import re
 import tempfile
 import unittest
+from collections import Counter
 from pathlib import Path
 
 from darq.core.identity import parse as _parse_identity
@@ -220,9 +227,21 @@ _DARQ_SOURCE_SUBDIRECTORIES = sorted(
     if path.is_dir() and path.name != "__pycache__"
 )
 
+#: The directory-name branch also refuses a versioned wire id,
+#: `pegasus/<word>/v<digits>` (`pegasus/core/v1`, `pegasus/ports/v2`). Its
+#: words come from `src/darq/`, so a frozen schema family that happens to be
+#: named like a package would otherwise be reported as a source path -- a
+#: false positive that fails closed on something nobody may rename. The
+#: refusal is exactly the segment `/v<digits>` followed by anything that is
+#: not a path continuation (`[\w./-]`): `pegasus/core/v1.py`, `pegasus/core/
+#: v1/` and `pegasus/core/v1x` are still paths as code would build them, and
+#: the `src/pegasus` branch has no such refusal at all, since a `src/` prefix
+#: is never a schema id. A sentence that ends right after the id (`.../v1.`)
+#: stays flagged, on purpose: it fails closed and is rewritten.
 UPSTREAM_PATH_STRING = re.compile(
     r"src/pegasus\b"
     r"|(?<![\w-])pegasus/(?:" + "|".join(_DARQ_SOURCE_SUBDIRECTORIES) + r")(?![\w-])"
+    r"(?!/v\d+(?![\w./-]))"
 )
 
 #: Form 4: an upstream agent's own name. Five of the six are derived, never
@@ -320,6 +339,77 @@ EXEMPT = {
     "tests/test_architecture.py": "_write_scratch_pegasus",
     "docs/transporte-desde-pegasus.md": "Segmentos separados",
 }
+
+_FORM_PATTERNS = {
+    "UPSTREAM_MODULE_PATH": UPSTREAM_MODULE_PATH,
+    "SPLIT_UPSTREAM_PATH_SEGMENT": SPLIT_UPSTREAM_PATH_SEGMENT,
+    "UPSTREAM_PATH_STRING": UPSTREAM_PATH_STRING,
+    "UPSTREAM_AGENT_NAME": UPSTREAM_AGENT_NAME,
+}
+
+#: What an exempt file is still allowed to say, as a multiset of
+#: `(pattern name, matched text)` -> how many times. An exemption is the
+#: justified occurrences, not the file: `_scanned_files` still skips an exempt
+#: file for the four whole-tree checks, but `ExemptionAllowlistTest` runs the
+#: same four patterns over it and requires the result to equal this table
+#: exactly. A new match fails (an `added` entry); an allowed one that
+#: disappears fails too (a `vanished` entry), so a stale line cannot hide the
+#: next offender. Line numbers are not part of the key, so editing around an
+#: allowed line does not break it; the matched text, with the few trailing
+#: identifier characters the match stops short of, is.
+#:
+#: Why each is allowed, per file, is the paragraph above `EXEMPT`: the probe
+#: packages named `pegasus` and the narrated `pegasus-orchestrator` incident
+#: in `test_architecture.py`, and the runbook's own worked examples.
+EXEMPT_OCCURRENCES = {
+    "tests/test_architecture.py": Counter({
+        ("SPLIT_UPSTREAM_PATH_SEGMENT", '"pegasus"/'): 2,
+        ("SPLIT_UPSTREAM_PATH_SEGMENT", '/ "pegasus"'): 1,
+        ("UPSTREAM_AGENT_NAME", "pegasus-orchestrator"): 3,
+        ("UPSTREAM_MODULE_PATH", "pegasus.adapters.opencode"): 2,
+        ("UPSTREAM_MODULE_PATH", "pegasus.cli"): 2,
+        ("UPSTREAM_MODULE_PATH", "pegasus.infra"): 4,
+        ("UPSTREAM_MODULE_PATH", "pegasus.ports"): 1,
+        ("UPSTREAM_PATH_STRING", "pegasus/core"): 1,
+    }),
+    "docs/transporte-desde-pegasus.md": Counter({
+        ("SPLIT_UPSTREAM_PATH_SEGMENT", '.joinpath("pegasus")'): 1,
+        ("SPLIT_UPSTREAM_PATH_SEGMENT", '/ "pegasus"'): 1,
+        ("SPLIT_UPSTREAM_PATH_SEGMENT", 'os.path.join(..., "pegasus", ...)'): 1,
+        ("UPSTREAM_AGENT_NAME", "king-pegasus"): 3,
+        ("UPSTREAM_AGENT_NAME", "pegasus-explorer.md"): 1,
+        ("UPSTREAM_AGENT_NAME", "pegasus-orchestrator"): 4,
+        ("UPSTREAM_AGENT_NAME", "pegasus-orchestrator.md"): 1,
+        ("UPSTREAM_MODULE_PATH", "pegasus.core.identity"): 1,
+        ("UPSTREAM_MODULE_PATH", "pegasus.tui"): 1,
+        ("UPSTREAM_MODULE_PATH", "pegasus.tui.app"): 1,
+        ("UPSTREAM_PATH_STRING", "pegasus/content"): 1,
+        ("UPSTREAM_PATH_STRING", "pegasus/core"): 3,  # the wire-id section's counter-examples
+        ("UPSTREAM_PATH_STRING", "src/pegasus"): 3,
+    }),
+}
+
+_IDENTIFIER_TAIL = re.compile(r"\w*(?:\.\w+)*")
+
+
+def _occurrences(text: str) -> Counter:
+    """Every match of the four patterns in `text`, keyed by pattern name and
+    matched text, extended over any identifier characters that follow so the
+    dotted-path pattern, which matches only `pegasus.i`, is recorded as
+    `pegasus.infra`. Linear: one `finditer` per pattern plus a bounded tail."""
+    found: Counter = Counter()
+    for name, pattern in _FORM_PATTERNS.items():
+        for match in pattern.finditer(text):
+            end = _IDENTIFIER_TAIL.match(text, match.end()).end()
+            found[(name, text[match.start():end])] += 1
+    return found
+
+
+def _occurrence_drift(text: str, allowed: Counter) -> tuple[Counter, Counter]:
+    """`(added, vanished)`: matches in `text` beyond `allowed`, and allowed
+    ones `text` no longer has. Both empty means the exemption is exact."""
+    found = _occurrences(text)
+    return found - allowed, allowed - found
 
 #: This file is excluded from its own scan. Its docstring explains the shapes
 #: it forbids and its tests feed those shapes to the patterns on purpose, so
@@ -432,6 +522,68 @@ class ScanScopeTest(unittest.TestCase):
                     needle,
                     path.read_text(encoding="utf-8"),
                     f"{relative} no longer contains {needle!r} -- its exemption may be dead weight",
+                )
+
+
+class ExemptionAllowlistTest(unittest.TestCase):
+    """An exempt file is not invisible: it is scanned like any other, and the
+    only matches it may keep are the ones `EXEMPT_OCCURRENCES` lists, each
+    with the count it is expected to have."""
+
+    SAMPLE = (
+        "A probe: `pegasus.infra.foo` and again pegasus.infra.foo.\n"
+        'child = ROOT / "pegasus"\n'
+        "Narrates `pegasus-orchestrator`.\n"
+    )
+    ALLOWED = Counter({
+        ("UPSTREAM_MODULE_PATH", "pegasus.infra.foo"): 2,
+        ("SPLIT_UPSTREAM_PATH_SEGMENT", '/ "pegasus"'): 1,
+        ("UPSTREAM_AGENT_NAME", "pegasus-orchestrator"): 1,
+    })
+
+    def test_the_sample_matches_its_allowlist_exactly(self):
+        added, vanished = _occurrence_drift(self.SAMPLE, self.ALLOWED)
+        self.assertEqual((added, vanished), (Counter(), Counter()))
+
+    def test_a_new_offender_in_an_exempt_file_is_reported(self):
+        for extra in (
+            "see `pegasus.core.identity`\n",
+            'p = Path("a") / "src" / "pegasus"\n',
+            'p = "src/pegasus/content/skills/"\n',
+            "delegate to king-pegasus\n",
+            "a third pegasus.infra.foo\n",
+        ):
+            with self.subTest(extra=extra):
+                added, vanished = _occurrence_drift(self.SAMPLE + extra, self.ALLOWED)
+                self.assertTrue(added)
+                self.assertFalse(vanished)
+
+    def test_an_allowed_occurrence_that_disappears_is_reported(self):
+        without = self.SAMPLE.replace("Narrates `pegasus-orchestrator`.\n", "")
+        added, vanished = _occurrence_drift(without, self.ALLOWED)
+        self.assertFalse(added)
+        self.assertEqual(vanished, Counter({("UPSTREAM_AGENT_NAME", "pegasus-orchestrator"): 1}))
+
+    def test_a_swap_that_keeps_the_count_is_still_reported(self):
+        swapped = self.SAMPLE.replace("pegasus-orchestrator", "king-pegasus")
+        added, vanished = _occurrence_drift(swapped, self.ALLOWED)
+        self.assertEqual(added, Counter({("UPSTREAM_AGENT_NAME", "king-pegasus"): 1}))
+        self.assertEqual(vanished, Counter({("UPSTREAM_AGENT_NAME", "pegasus-orchestrator"): 1}))
+
+    def test_every_exempt_file_has_an_allowlist_and_the_reverse(self):
+        self.assertEqual(set(EXEMPT), set(EXEMPT_OCCURRENCES))
+
+    def test_every_exempt_file_keeps_exactly_its_allowed_occurrences(self):
+        for relative in sorted(EXEMPT):
+            with self.subTest(path=relative):
+                text = (ROOT / relative).read_text(encoding="utf-8")
+                added, vanished = _occurrence_drift(text, EXEMPT_OCCURRENCES[relative])
+                self.assertEqual(
+                    (added, vanished),
+                    (Counter(), Counter()),
+                    f"{relative} gained an unlocalized upstream name (added) or lost one "
+                    "its allowlist still lists (vanished) -- localize the new one, or list it "
+                    "in EXEMPT_OCCURRENCES with its reason; drop the stale entry",
                 )
 
 
@@ -615,6 +767,38 @@ class NoUpstreamPathStringTest(unittest.TestCase):
         ):
             with self.subTest(identifier=identifier):
                 self.assertIsNone(UPSTREAM_PATH_STRING.search(identifier))
+
+    def test_a_versioned_wire_id_named_like_a_directory_is_not_flagged(self):
+        """A frozen wire id is `pegasus/<word>/v<digits>`. The directory
+        branch derives its words from `src/darq/`, so a schema family that
+        happens to be called `core` or `ports` is not a path: no source file
+        is ever named `v1`, and the shape is how every wire id spells itself."""
+        for identifier in (
+            '"pegasus/core/v1"',
+            '"pegasus/ports/v2"',
+            'SCHEMA = "pegasus/adapters/v10"',
+            "`pegasus/content/v3`",
+            "(pegasus/tui/v1)",
+        ):
+            with self.subTest(identifier=identifier):
+                self.assertIsNone(UPSTREAM_PATH_STRING.search(identifier))
+
+    def test_a_real_path_that_starts_like_a_version_is_still_flagged(self):
+        """The wire-id exemption is the whole `/v<digits>` segment and nothing
+        longer: a file, a directory or a longer name under a real
+        subdirectory is a path the way code would build it."""
+        for snippet in (
+            '"pegasus/core/v1.py"',
+            '"pegasus/core/v1/"',
+            '"pegasus/core/v1/identity.py"',
+            '"pegasus/core/v1x"',
+            '"pegasus/core/version.py"',
+            '"pegasus/core/identity.py"',
+            '"pegasus/core"',
+            "SRC / 'src/pegasus/core/v1'",
+        ):
+            with self.subTest(snippet=snippet):
+                self.assertTrue(UPSTREAM_PATH_STRING.search(snippet))
 
     def test_a_directory_name_used_as_a_mere_prefix_is_not_flagged(self):
         """The lookaround keeps `core`, a real subdirectory, from matching
