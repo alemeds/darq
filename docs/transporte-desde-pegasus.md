@@ -208,3 +208,18 @@ decirlo, no resolverlo.
 `identity.json` (reescrito entero) nunca se detectan como renombrados. Son exactamente los dos que
 llevan la identidad, o sea los que nunca se querría transportar. La propiedad salió por casualidad,
 pero conviene conocerla.
+
+## 10. El token de wire de credenciales NO es el de Pegasus
+
+La nota de la sección 6 sobre tokens que nunca se localizan **no** incluye `$PEGASUS_SECRET_<NOMBRE>`:
+`secret-transport.ts` ya está localizado en este fork a `$DARQ_SECRET_<NOMBRE>` (y su variable de
+catálogo a `DARQ_SECRET_TRANSPORT_CATALOG`). Todo archivo nuevo que hable ese formato debe usar el nombre
+de este fork: en 7.7.0 el script `engram-hook.py` del adaptador de Claude Code, y los fixtures `.mjs` que
+fijan la variable del catálogo —con el nombre de Pegasus, el plugin ignora el catálogo en silencio y la
+prueba de paridad compara contra otra cosa. Un archivo nuevo que lleve el token entra en las dos listas de
+excepción de `tests/test_architecture.py` (`PRODUCT_IDENTITY_ALLOWLIST` y `VERBATIM_ASSET_BRAND_EXEMPTIONS`).
+
+Otros dos recordatorios del mismo transporte: el directorio de datos de los tests de un commit nuevo
+suele venir como `pegasus-harness` (hay que ponerlo como `darq`, o como un nombre neutro cuando el test
+compara dos productos), y los assets nuevos que git no sigue como renombrados quedan bajo
+el árbol de paquete de upstream: moverlos con `git mv` a `src/darq/` y borrar los directorios vacíos que dejan.
