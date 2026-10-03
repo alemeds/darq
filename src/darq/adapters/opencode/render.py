@@ -1047,7 +1047,7 @@ def _permission(layout: Layout, item: Agent) -> dict[str, Any]:
     `"deny"`, and every tool and MCP entry above resolves to `"allow"` or
     `"deny"`. With that one site now `"allow"`, no Pegasus agent's rendered
     `permission` block contained the value `"ask"` anywhere, for any key. That
-    meant no Pegasus-shipped agent, at any depth, could still cause the
+    meant no DARQ-shipped agent, at any depth, could still cause the
     runtime to raise a permission prompt at all -- every tool call this map
     governed either proceeded or was refused outright. That no longer holds
     in full: the notes below list the `"ask"` values added since, and they
