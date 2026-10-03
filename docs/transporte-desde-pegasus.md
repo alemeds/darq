@@ -149,12 +149,15 @@ archivo que no existía— y antes de este guardián no había nada que lo mirar
   por un id de wire y lo deja pasar. No existe ningún archivo del árbol llamado `v1`, y un
   directorio con ese nombre exigiría el `/` final, que sí se marca; medido en
   `NoUpstreamPathStringTest.test_a_real_path_that_starts_like_a_version_is_still_flagged`.
-- Un `os.path.join(` o `.joinpath(` que nunca cierra, repetido miles de veces en un mismo archivo:
-  `SPLIT_UPSTREAM_PATH_SEGMENT` busca el `)` desde cada apertura, así que esa entrada artificial es
-  cuadrática: con 256 KB se midieron entre 30 s y casi 3 minutos, según la carga de la máquina. Ningún
-archivo real tiene esa forma; se anota para que
-  quien toque el patrón no lo dé por lineal. Con aperturas cerradas, 16 MB cuestan entre 1 y 3,5 s
-  por patrón.
+
+Un hueco que estuvo en esta lista y se cerró: un `os.path.join(` o `.joinpath(` que nunca cierra,
+repetido miles de veces en un mismo archivo. `SPLIT_UPSTREAM_PATH_SEGMENT` buscaba el `)` desde
+cada apertura y era cuadrático (4000 aperturas: 3,5 s; 16000: 47 s). Ahora es un objeto con
+`search`/`finditer` que recorre cada corrida hasta el próximo `)` una sola vez y neutraliza las
+aperturas que no pueden matchear; el regex original corre sin cambios sobre el texto enmascarado,
+con los mismos matches y offsets. Con 6000 aperturas tarda milisegundos, y con aperturas cerradas,
+16 MB cuestan entre 1 y 3,5 s por patrón. Cubierto en `SplitUpstreamPathSegmentLinearityTest`; el
+detalle está en `docs/arquitectura/arquitectura.md`.
 
 Lo único que sigue sin verse por decisión, no por hueco, es la prosa que nombra el producto
 ("Pegasus hace X"): es una decisión editorial, no un defecto de transporte, así que este guardián
