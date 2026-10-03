@@ -27,7 +27,7 @@ obligatorios igual que en `build_zipapp.py`, y `--out` se niega si ya existe. El
 corre este mismo comando con `src/darq/identity.json`, igual que cualquier otra distribución.
 
 Antes del paso 1, y sólo como información: `python3 tools/check_dependency_updates.py` lista, para cada
-dependencia fijada en `src/pegasus/content/mcp/*.md`, si existe una versión upstream más nueva
+dependencia fijada en `src/darq/content/mcp/*.md`, si existe una versión upstream más nueva
 (`update-available`, `major-available`, `review-0.x`, `unversioned` o `error`). Es una herramienta de
 mantenimiento que no se distribuye y no bloquea nada salvo que le pases `--strict`. Las versiones 0.x
 siempre se revisan a mano, porque un minor 0.x puede romper. Subir una dependencia es cambiar `version` y

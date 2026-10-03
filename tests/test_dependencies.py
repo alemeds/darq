@@ -582,7 +582,7 @@ class PruneTest(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
         self.dependencies_dir = self.root / "mcp"
-        self.filesystem = PosixFileSystem(product_id="pegasus-harness")
+        self.filesystem = PosixFileSystem(product_id="darq")
 
     def make(self, name: str, version: str) -> Path:
         path = self.dependencies_dir / name / version

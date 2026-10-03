@@ -107,7 +107,7 @@ class ClassifyTests(unittest.TestCase):
 
 class ParseTests(unittest.TestCase):
     def test_real_descriptors_parse(self) -> None:
-        descriptors = tool.load_descriptors(REPO_ROOT / "src" / "pegasus" / "content" / "mcp")
+        descriptors = tool.load_descriptors(REPO_ROOT / "src" / "darq" / "content" / "mcp")
         by_name = {d["name"]: d for d in descriptors}
         self.assertEqual({"cbm", "context7", "engram", "jira", "playwright"}, set(by_name))
         self.assertEqual(by_name["context7"]["distribution"], "remote")
