@@ -2,7 +2,7 @@
   "product_id": "darq",
   "display_name": "DARQ",
   "program_name": "darq",
-  "version": "7.5.0",
+  "version": "7.6.0",
   "wordmark_words": ["DARQ"],
   "release": {
     "asset_url_template": "https://github.com/balerdis/darq/releases/download/{tag}/{asset}",
