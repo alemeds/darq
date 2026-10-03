@@ -182,13 +182,64 @@ UPSTREAM_MODULE_PATH = re.compile(
 #: this would need real paren balancing, which a guard built on `re` does not
 #: do; nothing in this fork's current style nests a call inside a path join,
 #: so the gap is accepted rather than chased with a heavier tool.
-SPLIT_UPSTREAM_PATH_SEGMENT = re.compile(
+_SPLIT_UPSTREAM_PATH_SEGMENT_RE = re.compile(
     r'(["\'])pegasus\1\s*/'
     r'|/\s*(["\'])pegasus\2'
     r'|(["\'])src\3\s*,\s*(["\'])pegasus\4'
     r'|\.joinpath\([^)]*?(["\'])pegasus\5[^)]*?\)'
     r'|os\.path\.join\([^)]*?(["\'])pegasus\6[^)]*?\)'
 )
+
+_JOIN_OPENING = re.compile(r"\.joinpath\(|os\.path\.join\(")
+_JOIN_RUN = re.compile(r"(?:\.joinpath\(|os\.path\.join\()[^)]*")
+_PEGASUS_LITERAL = re.compile(r'(["\'])pegasus\1')
+_DEAD_OPENING = "\x00"
+
+
+class _LinearSplitSegmentPattern:
+    """`_SPLIT_UPSTREAM_PATH_SEGMENT_RE` with the quadratic case removed.
+
+    The `join`/`joinpath` alternatives scan from each opening to the next `)`.
+    An opening that never closes, repeated n times, makes every attempt rescan
+    the same tail: O(n^2). A regex cannot skip those attempts (the lookbehind
+    that would anchor them needs a variable width), but the verdict is shared:
+    an opening fails exactly when its run -- the text up to the next `)` --
+    lacks a quoted `pegasus` or is not closed by a `)`, and any later opening
+    in that run has a suffix of the same run, so it fails too. So a cheap
+    pre-pass finds each run once, and in a failing run neutralises every
+    opening (`(` -> NUL, same length, so offsets are unchanged); the original
+    regex then runs unchanged over the masked text. A masked opening could
+    never have matched, and the other alternatives cannot contain one, so the
+    matches (text and offsets) are identical to the original's.
+    """
+
+    def __init__(self, pattern: re.Pattern[str]) -> None:
+        self._pattern = pattern
+
+    @staticmethod
+    def _mask(text: str) -> str:
+        cuts: list[int] = []
+        for run in _JOIN_RUN.finditer(text):
+            end = run.end()
+            closed = text.startswith(")", end)
+            if closed and _PEGASUS_LITERAL.search(text, run.start(), end):
+                continue
+            cuts.extend(opening.end() - 1 for opening in _JOIN_OPENING.finditer(text, run.start(), end))
+        if not cuts:
+            return text
+        chars = list(text)
+        for index in cuts:
+            chars[index] = _DEAD_OPENING
+        return "".join(chars)
+
+    def search(self, text: str) -> re.Match[str] | None:
+        return self._pattern.search(self._mask(text))
+
+    def finditer(self, text: str):
+        return self._pattern.finditer(self._mask(text))
+
+
+SPLIT_UPSTREAM_PATH_SEGMENT = _LinearSplitSegmentPattern(_SPLIT_UPSTREAM_PATH_SEGMENT_RE)
 
 #: Form 3: the same renamed source path, written as one string instead of
 #: split across literals -- including inside a regex, where `r"src/pegasus/
@@ -441,7 +492,7 @@ def _scanned_files() -> list[Path]:
     )
 
 
-def _offenders(pattern: re.Pattern[str]) -> dict[str, list[str]]:
+def _offenders(pattern: "re.Pattern[str] | _LinearSplitSegmentPattern") -> dict[str, list[str]]:
     """Every scanned file with at least one match, each paired with the
     lines it matched on.
 
@@ -715,6 +766,96 @@ class NoSplitUpstreamPathSegmentTest(unittest.TestCase):
         ):
             with self.subTest(identifier=identifier):
                 self.assertIsNone(SPLIT_UPSTREAM_PATH_SEGMENT.search(identifier))
+
+
+class SplitUpstreamPathSegmentLinearityTest(unittest.TestCase):
+    """The `join`/`joinpath` alternatives used to be quadratic on an opening
+    that never closes, repeated; `_LinearSplitSegmentPattern` removes that
+    without changing a single match."""
+
+    #: The pattern as it was before the pre-pass, kept verbatim as the oracle.
+    REFERENCE = re.compile(
+        r'(["\'])pegasus\1\s*/'
+        r'|/\s*(["\'])pegasus\2'
+        r'|(["\'])src\3\s*,\s*(["\'])pegasus\4'
+        r'|\.joinpath\([^)]*?(["\'])pegasus\5[^)]*?\)'
+        r'|os\.path\.join\([^)]*?(["\'])pegasus\6[^)]*?\)'
+    )
+
+    @staticmethod
+    def _spans(pattern, text):
+        return [(match.start(), match.end(), match.group(0)) for match in pattern.finditer(text)]
+
+    def assertSameMatches(self, text):
+        self.assertEqual(
+            self._spans(SPLIT_UPSTREAM_PATH_SEGMENT, text),
+            self._spans(self.REFERENCE, text),
+            repr(text),
+        )
+
+    def test_the_known_fixtures_match_exactly_as_before(self):
+        for snippet in (
+            '_ROOT / "src" / "pegasus" / "content"',
+            "_ROOT / 'src' / 'pegasus' / 'content'",
+            '("src", "pegasus", "content")',
+            '(\n    "src",\n    "pegasus",\n    "content",\n)',
+            'os.path.join("some", "root", "pegasus", "content")',
+            'os.path.join("pegasus")',
+            '.joinpath("pegasus")',
+            'ROOT.joinpath("pegasus")',
+            'os.path.join(str(ROOT), "pegasus")',
+            'ROOT.joinpath(str(x), "pegasus")',
+            'BANNED_FRAGMENTS = ("pegasus", "harness", "balerdis")',
+            'root = _package_files("pegasus")',
+            "sys.argv = ['pegasus'] + args",
+            'os.path.join("darq", "content")',
+            'ROOT.joinpath("darq")',
+            'SCHEMA = "pegasus-harness/journal/v4"',
+            '"pegasus/cli-report/v1"',
+            '"/pegasus/catalog-build"',
+            'CLIENT_NAME = "pegasus-doctor"',
+            '.joinpath("pegasus"',
+            '.joinpath(.joinpath("pegasus", .joinpath(x)) os.path.join("pegasus")',
+        ):
+            with self.subTest(snippet=snippet):
+                self.assertSameMatches(snippet)
+
+    def test_every_scanned_file_matches_exactly_as_before(self):
+        for path in _scanned_files():
+            with self.subTest(path=str(path.relative_to(ROOT))):
+                self.assertSameMatches(path.read_text(encoding="utf-8"))
+
+    def test_generated_inputs_match_exactly_as_before(self):
+        import itertools
+        import random
+
+        tokens = (
+            ".joinpath(", "os.path.join(", ")", "(", '"pegasus"', "'pegasus'", '"pegasus\'',
+            '"src"', ",", " ", "\n", "/", "x", '"darq"', "str(r)",
+        )
+        rng = random.Random(20261003)
+        generated = [
+            "".join(combo) for size in (1, 2, 3) for combo in itertools.product(tokens, repeat=size)
+        ]
+        for _ in range(3000):
+            generated.append("".join(rng.choice(tokens) for _ in range(rng.randint(1, 14))))
+        for text in generated:
+            self.assertSameMatches(text)
+
+    def test_an_opening_that_never_closes_is_linear(self):
+        """Measured on the old pattern: ~3.5 s at n=4000, ~12 s at n=8000,
+        ~47 s at n=16000. The linear version takes milliseconds; the
+        threshold is a hundred times that to stay robust on a slow machine."""
+        import time
+
+        for opening in (".joinpath(", "os.path.join(", '.joinpath("pegasus"'):
+            text = opening * 6000
+            with self.subTest(opening=opening):
+                started = time.perf_counter()
+                SPLIT_UPSTREAM_PATH_SEGMENT.search(text)
+                list(SPLIT_UPSTREAM_PATH_SEGMENT.finditer(text))
+                elapsed = time.perf_counter() - started
+                self.assertLess(elapsed, 1.0, f"{opening!r} x 6000 took {elapsed:.2f}s -- quadratic again")
 
 
 class NoUpstreamPathStringTest(unittest.TestCase):
