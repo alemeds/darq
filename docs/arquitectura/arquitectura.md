@@ -1928,7 +1928,6 @@ Trabajo conocido que no pertenece a ninguna unidad del corte. Se acarrea a prop�
 | El puerto de engram (7437) es compartido por todos los usuarios de la máquina: si el `engram serve` de uno lo ocupa, los hooks de Claude Code de otro (y el plugin de engram de OpenCode, que ya se comportaba así) mandan sus sesiones y prompts a la base del primero. Encontrado en la prueba en vivo de 7.7.0, que usó `ENGRAM_PORT=7438` para evitarlo | Aislar por usuario: un puerto propio por usuario, o comprobar quién es dueño del servidor antes de escribirle | Fijar `ENGRAM_PORT` a un puerto propio en cada usuario de una máquina compartida y comprobar con `engram stats` |
 | Quien tenga a la vez los hooks de engram de DARQ en Claude Code y el plugin de engram del fork guarda cada prompt dos veces: una con las credenciales tapadas (el hook de DARQ) y otra tal como se escribió (el `UserPromptSubmit` del plugin, que solo saca `<private>`). La revisión de 7.7.0 había afirmado lo contrario, que el plugin no guardaba prompts, y era falso | Tapar credenciales también en el plugin (idea anotada en el fork, `docs/arquitectura-engram.md`), o que DARQ detecte el plugin instalado y lo avise. Importa cuando se pase a DARQ un Claude Code que ya usa el plugin | No tener los dos a la vez: con DARQ en Claude Code, desinstalar el plugin de engram |
 | Recuperación después de compactar bajo Claude Code: los hooks de 7.7.0 no cubren `compact` ni devuelven contexto a la sesión. Es el slice siguiente | Decidir qué se devuelve y cómo sin volver al protocolo inyectado de 7.1.0 | Pedirle al agente `mem_context` al retomar |
-| playwright 0.0.83 está disponible y el contenido fija 0.0.79 (`tools/check_dependency_updates.py`, primera corrida real). Subirlo necesita integridad y lockfile nuevos | Leer el changelog de playwright antes de subir | Nada: la 0.0.79 sigue andando |
 | El hook de engram de Claude Code no tiene el equivalente de `redactKnownValues` del plugin de OpenCode: tapa por catálogo, pero no los valores que la sesión ya conoce | Portar el mecanismo al script del hook | No pegar credenciales en prompts, que bajo Claude Code el modelo igual las ve |
 
 ### Deudas resueltas
@@ -1989,6 +1988,7 @@ Una deuda de la tabla de arriba puede cerrarse con código en vez de perder el s
 | `toolCounts` en el plugin de engram se escribía y nunca se leía; 7.2.0 lo dejó a propósito porque sacarlo tocaba tres sitios que esa unidad no necesitaba | Se sacó en 7.7.0 (`b55c14a`), sin cambio de comportamiento |
 | `update` dejaba en `<data_dir>/mcp/<nombre>/<versión>` las versiones viejas de los servidores MCP descargados, que ninguna instalación volvía a usar | Desde 7.7.0, después de un install o update exitoso y en `uninstall`, se borran las que no usa ninguna instalación del journal, las fijadas hoy ni la que usaba la CLI antes del update (para que un `restore` siga andando). Mejor esfuerzo, sin seguir symlinks, informado como `pruned_dependencies`. Costo: restaurar más de un update atrás pide `darq update` después |
 | La captura pasiva de engram no existía bajo Claude Code: el hook del plugin del fork lee un campo `.stdout` que `SubagentStop` nunca manda | Resuelta en 7.7.0 con el hook `SubagentStop` propio de DARQ, que lee `last_assistant_message` y lo manda a la captura pasiva (sólo guarda con `## Key Learnings`). El transporte de credenciales bajo Claude Code sigue imposible: ver «7.7.0» |
+| playwright 0.0.83 estaba disponible y el contenido fijaba 0.0.79 (`tools/check_dependency_updates.py`, primera corrida real) | 7.7.2 sube el pin a 0.0.83: `content/mcp/playwright.md` con endpoint, versión e integridad nuevos (la integridad se verificó contra `npm view` y contra el hash del tgz descargado) y `playwright-package-lock.json` regenerado con `npm install --package-lock-only --ignore-scripts`. Se leyó el changelog antes de subir y se probó con una instalación real: `npm ci --ignore-scripts` con ese lockfile y el servidor arrancado con `--headless` sobre Chrome del sistema |
 
 ### Deudas disueltas
 
@@ -2405,7 +2405,7 @@ Registra tres cambios, lo que se midió y lo que queda pendiente.
 
 9. **`toolCounts` salió de `engram.ts`.** Código muerto: se escribía y nunca se leía (la nota de 7.2.0 lo había dejado a propósito).
 
-10. **`tools/check_dependency_updates.py`.** Herramienta de quien mantiene, para correr antes de cada release (ya está en `docs/release-distribution.md`). Lista las versiones más nuevas de cada dependencia fijada en `content/mcp/*.md`: releases de GitHub para cbm y engram, npm para playwright. No cruza la versión mayor, y toda 0.x más nueva se marca para revisión manual. Por defecto sólo informa; `--strict` sale con `1`. Es idéntica byte por byte en DARQ porque descubre `src/*/content/mcp`. **Primera corrida real:** playwright 0.0.83 está disponible (fijado en 0.0.79); cbm y engram están al día. Ver la deuda en la tabla.
+10. **`tools/check_dependency_updates.py`.** Herramienta de quien mantiene, para correr antes de cada release (ya está en `docs/release-distribution.md`). Lista las versiones más nuevas de cada dependencia fijada en `content/mcp/*.md`: releases de GitHub para cbm y engram, npm para playwright. No cruza la versión mayor, y toda 0.x más nueva se marca para revisión manual. Por defecto sólo informa; `--strict` sale con `1`. Es idéntica byte por byte en DARQ porque descubre `src/*/content/mcp`. **Primera corrida real:** playwright 0.0.83 está disponible (fijado en 0.0.79); cbm y engram están al día. La deuda se resolvió en 7.7.2.
 
 ## 7.7.1: engram 1.21.0
 
@@ -2415,3 +2415,13 @@ Registra tres cambios, lo que se midió y lo que queda pendiente.
    - El aviso de actualización de engram dice los dos pasos correctos: `darq upgrade` y después `darq update --cli <cli>`.
    - Terminar una sesión sin resumen ya no borra el resumen guardado.
 3. **El resto de la 1.21.0 es del plugin de Claude Code del fork** (0.2.0), que DARQ no instala: está en `docs/arquitectura-engram.md` del fork. De ahí sale una deuda nueva de este lado: tener a la vez los hooks de DARQ y ese plugin guarda cada prompt dos veces, una tapada y otra no.
+
+## 7.7.2: Playwright MCP 0.0.83
+
+1. **DARQ sube Playwright MCP de 0.0.79 a 0.0.83.** `content/mcp/playwright.md` apunta al tgz `mcp-0.0.83.tgz` con su integridad, y `playwright-package-lock.json` se regeneró: `playwright` y `playwright-core` pasan a 1.64.0 alpha y `fsevents` ya no figura, porque playwright 1.64 dejó de declararlo como dependencia opcional. El lockfile sigue siendo idéntico byte por byte al de Pegasus.
+2. **Lo que trae:**
+   - El chequeo de acceso a archivos ahora sigue los symlinks: un symlink dentro del workspace ya no deja leer ni escribir fuera de las raíces permitidas. Es el cambio de seguridad que justifica subir.
+   - `/killkillkill` ya no se registra fuera de los tests.
+   - El resto son herramientas y opciones nuevas (grabación, `browser_emulate_media`, `--idle-timeout`) y correcciones de estabilidad.
+3. **El cambio de sandbox en Linux no nos toca.** Desde la 0.0.81 el Chromium empaquetado arranca sin sandbox por defecto en Linux. DARQ no pasa argumentos al servidor, así que el navegador por defecto es el Chrome del sistema, que sigue con sandbox; `--sandbox` lo reactiva para el empaquetado.
+4. **Ningún nombre de herramienta ni opción que use DARQ cambió.** Las herramientas `browser_webmcp_*` de la 0.0.81 ya no existían en la 0.0.82 y ni la 0.0.79 ni DARQ las usaban. Se resolvió la deuda «playwright 0.0.83 está disponible».

@@ -2,10 +2,10 @@
 name: playwright
 description: Drives a real browser to exercise and inspect the pages a project renders
 distribution: npm
-endpoint: https://registry.npmjs.org/@playwright/mcp/-/mcp-0.0.79.tgz
+endpoint: https://registry.npmjs.org/@playwright/mcp/-/mcp-0.0.83.tgz
 package: "@playwright/mcp"
-version: 0.0.79
-integrity: sha512-VpqD4a3vFyGQMY9sh3UJiO6wjcurggkljKfAyCHL0QWGY5m6Ehr3MNsAAHPDHO//n13g0PCjpHatAOiulrqdZQ==
+version: 0.0.83
+integrity: sha512-oNcl+Ae2/IAjhfPeP46BfIkSakfmprY+aOtkv5MjrQ4lPav4/yNtPhL0iq8SlIM90oApWgBDUxaNKvktazUKOg==
 entry: cli.js
 lockfile: playwright-package-lock.json
 reaches: [arquitecto-darq, darq-explorer, darq-general, darq-implementer, darq-orchestrator, darq-verifier, sdd-apply, sdd-explore, sdd-verify]
