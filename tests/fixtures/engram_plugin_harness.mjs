@@ -7,7 +7,8 @@
 // before importing it, and stubs `fetch` to record every call instead of
 // reaching a real engram server.
 //
-// Prints one JSON object to stdout: { cases: [{ tool, posted, body }] }.
+// Prints one JSON object to stdout: { cases: [{ tool, posted, body }], hooks: [...] } (`hooks` is
+// every hook name the plugin registers).
 // The Python test (`tests/test_engram_memory_scope.py`,
 // `EngramPluginPassiveCaptureNodeTest`) parses this and makes the assertions
 // — this file only drives the plugin and reports what happened.
@@ -100,4 +101,4 @@ await run("ENGRAM_mem_search", learningsOutput, "fresh-b", "ENGRAM_mem_search")
 await run("mem_save", learningsOutput, "fresh-c", "mem_save")
 await run("read", learningsOutput, "fresh-d", "read-control")
 
-console.log(JSON.stringify({ cases }))
+console.log(JSON.stringify({ cases, hooks: Object.keys(plugin) }))

@@ -31,11 +31,12 @@ write you want it to make, and a durable finding in its reply is yours to save.
 
 ## Sub-Agent Findings (`## Key Learnings`)
 
-Where the platform's own plugin performs a passive capture on the way back from a
-launched agent, a sub-agent can have specific findings saved for it without ever
-calling a memory tool: when its brief asks for this, it ends its reply with a
-`## Key Learnings` section, and that section is saved automatically once the reply
-returns.
+When engram is selected, a passive capture runs on the way back from a launched
+agent — the platform's own plugin on the sub-agent tool's output, or its hook on the
+sub-agent's last message, whichever the platform provides. A sub-agent can therefore
+have specific findings saved for it without ever calling a memory tool: when its
+brief asks for this, it ends its reply with a `## Key Learnings` section, and that
+section is saved automatically once the reply returns.
 
 The section, exactly:
 
@@ -59,14 +60,10 @@ The section, exactly:
   the **launcher's** session — the passive capture runs in the launching agent's
   hook, not the sub-agent's.
 
-This save exists only where the platform this session runs under ships a plugin
-that performs the capture on the sub-agent tool's output. Where no such capture
-runs (no plugin installed for this session, or none exists for it), a
-`## Key Learnings` section is not saved on its own. The agent that launched the
-sub-agent relies on its own instructions to tell which case applies: if those
-instructions state this save runs automatically, it leaves the items to that;
-otherwise it saves them itself from the reply — it never searches memory just
-to confirm either way.
+This save runs on every platform whenever engram is selected. The agent that
+launched the sub-agent leaves its `## Key Learnings` items to that capture: it
+does not save them again and never searches memory just to confirm they landed.
+Anything else durable in the reply is still its to save.
 
 ## Proactive Save Triggers (if you are the agent talking with the person)
 

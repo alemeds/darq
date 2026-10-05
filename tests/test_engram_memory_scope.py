@@ -59,9 +59,9 @@ SESSION_CLOSE_STEM = re.compile(
 
 #: A paragraph that discusses the `## Key Learnings` opt-in save mechanism
 #: (7.2.0): a sub-agent whose brief asks for it ends its reply with a
-#: `## Key Learnings` section; the OpenCode plugin's passive-capture hook,
-#: fixed in this release to fire on the real (lowercase) sub-agent tool id,
-#: saves it -- no memory tool call from the sub-agent itself.
+#: `## Key Learnings` section; the passive capture (the engram plugin on the
+#: `task` output in OpenCode, the `SubagentStop` hook in Claude Code) saves
+#: it -- no memory tool call from the sub-agent itself.
 KEY_LEARNINGS_STEM = re.compile(r"key learnings", re.IGNORECASE)
 
 #: Phrasing that would re-open a blanket mandate on this specific
@@ -113,7 +113,8 @@ NON_SDD_MANDATE_STEM = re.compile(
 
 #: Phrasing 7.1.0 retired: every task end read as a save trigger, and any
 #: session end (a reply, a "done") read as a close. None of it may survive
-#: anywhere in shipped content -- not reworded, not restated with new words.
+#: anywhere in shipped content -- the shared block, the convention, the
+#: skills and the plugin source -- not reworded, not restated with new words.
 RETIRED_PRESSURE_PHRASES = (
     "save NOW",
     "Self-check after",
@@ -141,28 +142,12 @@ def paragraphs_on(text: str, stem: re.Pattern[str]) -> set[str]:
     return {p for p in paragraphs_of(text) if stem.search(p)}
 
 
-def memory_instructions() -> str:
-    """The `MEMORY_INSTRUCTIONS` template literal body, extracted from the
-    plugin source rather than retyped -- the plugin ships this text
-    unrendered, so lifting it is the only way to check it without a JS
-    runtime (see `EngramPluginMemoryScopeTest` below)."""
-    source = read(PLUGIN)
-    match = re.search(
-        r"const MEMORY_INSTRUCTIONS = `(.*?)`\n\n// ─── HTTP Client",
-        source,
-        re.DOTALL,
-    )
-    assert match is not None, "engram.ts no longer defines MEMORY_INSTRUCTIONS this way"
-    return match.group(1)
-
-
 #: The two paragraphs `system-prompt/mcp/engram.md` carries on each subject,
 #: pinned as written. The heading-only block above the first is not itself
 #: on either subject (it names the section, it does not state the rule).
 AMBIENT_SUBAGENT_WRITE_PARAGRAPHS = frozenset(
     {
         '### If you were launched by another agent',
-        'When your brief asks you to record learnings, end your reply with a `## Key Learnings` section: numbered, one durable finding per item, each a self-contained sentence on one line. Call no memory tool for it — whoever launched you takes care of saving it. Without that request, write no such section.',
         'You make no memory writes — no `mem_save`, `mem_update`, `mem_session_summary`, nor the `mem_judge` that follows a save — unless your brief asks for one. You may still read memory: `mem_search`, `mem_context`, `mem_get_observation`. What deserves keeping goes in your reply; whoever launched you decides what to save.',
     }
 )
@@ -193,27 +178,27 @@ CONVENTION_SUBAGENT_WRITE_PARAGRAPHS = frozenset(
         "For an SDD phase sub-agent, the `Artifact store mode` line in your launch — `engram` or `hybrid` — is the brief asking for exactly this artifact write; it is not a license to save anything else. Ad-hoc discovery saves and `mem_session_summary` stay the launching agent's job, not yours, per the Memory Scope rule above.",
         'If you were launched by another agent, you make no memory writes — no `mem_save`, `mem_update`, `mem_session_summary`, nor the `mem_judge` that follows a save — unless your brief asks for one. You may still read: `mem_search`, `mem_context`, `mem_get_observation`. What deserves keeping goes in your reply; whoever launched you decides what to save.',
         "NOTE: Critical engram calls (`mem_search`, `mem_save`, `mem_get_observation`) are inlined directly in each skill's SKILL.md. This section is supplementary reference — sub-agents do NOT need to read it to function.",
-        "This save exists only where the platform this session runs under ships a plugin that performs the capture on the sub-agent tool's output. Where no such capture runs (no plugin installed for this session, or none exists for it), a `## Key Learnings` section is not saved on its own. The agent that launched the sub-agent relies on its own instructions to tell which case applies: if those instructions state this save runs automatically, it leaves the items to that; otherwise it saves them itself from the reply — it never searches memory just to confirm either way.",
-        "Where the platform's own plugin performs a passive capture on the way back from a launched agent, a sub-agent can have specific findings saved for it without ever calling a memory tool: when its brief asks for this, it ends its reply with a `## Key Learnings` section, and that section is saved automatically once the reply returns.",
+        "This save runs on every platform whenever engram is selected. The agent that launched the sub-agent leaves its `## Key Learnings` items to that capture: it does not save them again and never searches memory just to confirm they landed. Anything else durable in the reply is still its to save.",
+        "When engram is selected, a passive capture runs on the way back from a launched agent — the platform's own plugin on the sub-agent tool's output, or its hook on the sub-agent's last message, whichever the platform provides. A sub-agent can therefore have specific findings saved for it without ever calling a memory tool: when its brief asks for this, it ends its reply with a `## Key Learnings` section, and that section is saved automatically once the reply returns.",
     }
 )
 
 #: The `## Key Learnings` opt-in save mechanism, pinned by file. Ambient and
-#: convention are exact-set pinned like the two subjects above; the plugin's
-#: own copy and the shared persistence contract are checked by substring,
+#: convention are exact-set pinned like the two subjects above; the shared
+#: persistence contract is checked by substring,
 #: consistent with how this module already checks those two files elsewhere.
 AMBIENT_KEY_LEARNINGS_PARAGRAPHS = frozenset(
     {
-        "To have a launched agent's findings saved this way, ask its brief to end with a `## Key Learnings` section. If your own instructions state that a launched agent's `## Key Learnings` items are saved automatically, leave them to that; otherwise, save them yourself from its reply — never search memory just to confirm they landed. Anything else durable in its reply is still yours to save.",
-        'When your brief asks you to record learnings, end your reply with a `## Key Learnings` section: numbered, one durable finding per item, each a self-contained sentence on one line. Call no memory tool for it — whoever launched you takes care of saving it. Without that request, write no such section.',
+        "To have a launched agent's findings saved this way, ask its brief to end with a `## Key Learnings` section. Its items are saved automatically when its reply returns, one observation each: don't save them again yourself, and never search memory just to confirm they landed. Anything else durable in its reply is still yours to save.",
+        'When your brief asks you to record learnings, end your reply with a `## Key Learnings` section: numbered, one durable finding per item, each a self-contained sentence on one line. Call no memory tool for it — it is saved automatically when your reply returns. Without that request, write no such section.',
     }
 )
 CONVENTION_KEY_LEARNINGS_PARAGRAPHS = frozenset(
     {
         '## Sub-Agent Findings (`## Key Learnings`)',
         "- Always write the heading exactly as `## Key Learnings`, on its own line. As compatibility forms only, engram v1.20.0's extractor (`ExtractLearnings`, `internal/store/store.go`) also recognizes `### Key Learnings`, `## Learnings` and `### Learnings` — never a heading with a single `#`: the extractor's heading pattern is anchored to two or three `#` (`^#{2,3}`), so one `#` is not recognized and nothing under it is saved. - Items are numbered (`1.`, `2.`, ...), one durable finding per item, each a self-contained sentence on its own line. A bulleted list is used only as a fallback when there are no numbered items. - Each item needs 20 or more characters and 4 or more words after stripping bold, italic and inline-code markup — a fragment shorter than that is dropped, not saved short. - If the reply has more than one such section, only the **last** one that yields valid items is used; an earlier one is discarded, not merged. - Saved items are deduplicated by a normalized hash within the project — the same finding written twice does not produce two observations. - Each item lands as its own observation, type `passive`, scope project, linked to the **launcher's** session — the passive capture runs in the launching agent's hook, not the sub-agent's.",
-        "This save exists only where the platform this session runs under ships a plugin that performs the capture on the sub-agent tool's output. Where no such capture runs (no plugin installed for this session, or none exists for it), a `## Key Learnings` section is not saved on its own. The agent that launched the sub-agent relies on its own instructions to tell which case applies: if those instructions state this save runs automatically, it leaves the items to that; otherwise it saves them itself from the reply — it never searches memory just to confirm either way.",
-        "Where the platform's own plugin performs a passive capture on the way back from a launched agent, a sub-agent can have specific findings saved for it without ever calling a memory tool: when its brief asks for this, it ends its reply with a `## Key Learnings` section, and that section is saved automatically once the reply returns.",
+        "This save runs on every platform whenever engram is selected. The agent that launched the sub-agent leaves its `## Key Learnings` items to that capture: it does not save them again and never searches memory just to confirm they landed. Anything else durable in the reply is still its to save.",
+        "When engram is selected, a passive capture runs on the way back from a launched agent — the platform's own plugin on the sub-agent tool's output, or its hook on the sub-agent's last message, whichever the platform provides. A sub-agent can therefore have specific findings saved for it without ever calling a memory tool: when its brief asks for this, it ends its reply with a `## Key Learnings` section, and that section is saved automatically once the reply returns.",
     }
 )
 CONVENTION_SESSION_CLOSE_PARAGRAPHS = frozenset(
@@ -250,7 +235,7 @@ class AmbientBlockScopeTest(unittest.TestCase):
     def setUp(self):
         self.text = read(AMBIENT)
 
-    def test_subagent_write_paragraphs_are_exactly_the_pinned_three(self):
+    def test_subagent_write_paragraphs_are_exactly_the_pinned_two(self):
         self.assertEqual(paragraphs_on(self.text, SUBAGENT_WRITE_STEM), AMBIENT_SUBAGENT_WRITE_PARAGRAPHS)
 
     def test_session_close_paragraphs_are_exactly_the_pinned_three(self):
@@ -285,94 +270,6 @@ class ConventionScopeTest(unittest.TestCase):
 
     def test_no_key_learnings_mandate_regardless_of_brief(self):
         self.assertEqual(paragraphs_on(self.text, KEY_LEARNINGS_MANDATE_STEM), set())
-
-
-class EngramPluginMemoryScopeTest(unittest.TestCase):
-    """The plugin injects its own copy of the protocol (`MEMORY_INSTRUCTIONS`)
-    because the ambient block and the plugin are not installed under the same
-    condition (the plugin ships on every OpenCode install; the ambient block
-    only when `engram` is a selected MCP) -- so both copies must independently
-    say the same thing on these two subjects."""
-
-    def setUp(self):
-        self.text = memory_instructions()
-
-    def test_it_states_the_subagent_write_rule(self):
-        paragraphs = paragraphs_on(self.text, SUBAGENT_WRITE_STEM)
-        self.assertTrue(
-            any("unless your brief asks for one" in p for p in paragraphs),
-            "MEMORY_INSTRUCTIONS no longer states the sub-agent write rule",
-        )
-
-    def test_it_states_the_session_close_rule(self):
-        paragraphs = paragraphs_on(self.text, SESSION_CLOSE_STEM)
-        self.assertTrue(
-            any("only at a real close" in p for p in paragraphs),
-            "MEMORY_INSTRUCTIONS no longer states the real-close rule",
-        )
-
-    def test_it_no_longer_makes_session_close_mandatory_on_every_task_end(self):
-        for phrase in RETIRED_PRESSURE_PHRASES:
-            with self.subTest(phrase=phrase):
-                self.assertNotIn(phrase, self.text)
-
-    def test_its_after_compaction_section_is_gated_to_the_root_agent(self):
-        # Blocking 2's plugin-side counterpart: the plugin's own copy of the
-        # after-compaction nudge must name who it is for too, not just the
-        # convention file.
-        paragraphs = paragraphs_on(self.text, SESSION_CLOSE_STEM)
-        self.assertTrue(
-            any(
-                "agent talking with the person" in p and "FIRST ACTION REQUIRED" in p
-                for p in paragraphs
-            ),
-            "MEMORY_INSTRUCTIONS' after-compaction paragraph is not gated to the root agent",
-        )
-
-    def test_it_states_the_key_learnings_mechanism_both_ways(self):
-        # 7.2.0: the plugin's own copy must state both halves -- what a
-        # launched sub-agent does when asked, and what the launching agent
-        # gets in return -- consistent with the ambient block.
-        paragraphs = paragraphs_on(self.text, KEY_LEARNINGS_STEM)
-        self.assertTrue(
-            any("call no memory tool for it" in p for p in paragraphs),
-            "MEMORY_INSTRUCTIONS no longer tells a sub-agent it calls no memory tool",
-        )
-        self.assertTrue(
-            any("saved automatically when it returns" in p for p in paragraphs),
-            "MEMORY_INSTRUCTIONS no longer tells the launcher its items are saved automatically",
-        )
-
-    def test_no_key_learnings_mandate_regardless_of_brief(self):
-        self.assertEqual(paragraphs_on(self.text, KEY_LEARNINGS_MANDATE_STEM), set())
-
-
-class EngramPluginFailsClosedTest(unittest.TestCase):
-    """Blocking 3: `experimental.chat.system.transform`'s subagent guard used
-    to read `input.sessionID && subAgentSessions.has(...)`, which fails OPEN
-    when `sessionID` is absent (it is optional on this hook) -- an unknown
-    session got the write-triggering protocol injected instead of being
-    skipped. The fixed guard must return early on a falsy `sessionID` too."""
-
-    def setUp(self):
-        self.text = read(PLUGIN)
-
-    def _transform_hook_body(self) -> str:
-        match = re.search(
-            r'"experimental\.chat\.system\.transform": async \(input, output\) => \{(.*?)\n    \},',
-            self.text,
-            re.DOTALL,
-        )
-        assert match is not None, "chat.system.transform hook not found in this shape"
-        return match.group(1)
-
-    def test_the_guard_fails_closed_on_a_missing_session_id(self):
-        body = self._transform_hook_body()
-        self.assertIn("if (!input.sessionID || subAgentSessions.has(input.sessionID)) return", body)
-
-    def test_the_old_fail_open_guard_is_gone(self):
-        body = self._transform_hook_body()
-        self.assertNotIn("if (input.sessionID && subAgentSessions.has(input.sessionID)) return", body)
 
 
 class NonSDDWriteMandateGoneTest(unittest.TestCase):
@@ -446,7 +343,7 @@ class PersistenceContractKeyLearningsTest(unittest.TestCase):
             "PERSISTENCE: End your reply with a `## Key Learnings` section",
             self.text,
         )
-        self.assertIn("Call no memory tool for it; whoever launched you takes care of saving it.", self.text)
+        self.assertIn("Call no memory tool for it; it is saved automatically when your reply returns.", self.text)
         self.assertNotIn("Call mem_save(title:", self.text)
 
     def test_no_key_learnings_mandate_regardless_of_brief(self):
@@ -476,21 +373,14 @@ class KeyLearningsMandateNeverShipsTest(unittest.TestCase):
 AMBIENT_VERIFICATION_LOOP_PARAGRAPHS = frozenset(
     {
         "To have a launched agent's findings saved this way, ask its brief to end with a "
-        "`## Key Learnings` section. If your own instructions state that a launched agent's "
-        "`## Key Learnings` items are saved automatically, leave them to that; otherwise, save them "
-        "yourself from its reply — never search memory just to confirm they landed. Anything else "
-        "durable in its reply is still yours to save.",
+        "`## Key Learnings` section. Its items are saved automatically when its reply returns, one "
+        "observation each: don't save them again yourself, and never search memory just to confirm "
+        "they landed. Anything else durable in its reply is still yours to save.",
     }
 )
 CONVENTION_VERIFICATION_LOOP_PARAGRAPHS = frozenset(
     {
-        "This save exists only where the platform this session runs under ships a plugin that "
-        "performs the capture on the sub-agent tool's output. Where no such capture runs (no plugin "
-        "installed for this session, or none exists for it), a `## Key Learnings` section is not saved "
-        "on its own. The agent that launched the sub-agent relies on its own instructions to tell which "
-        "case applies: if those instructions state this save runs automatically, it leaves the items to "
-        "that; otherwise it saves them itself from the reply — it never searches memory just to confirm "
-        "either way.",
+        "This save runs on every platform whenever engram is selected. The agent that launched the sub-agent leaves its `## Key Learnings` items to that capture: it does not save them again and never searches memory just to confirm they landed. Anything else durable in the reply is still its to save.",
     }
 )
 
@@ -499,9 +389,10 @@ class NoVerificationLoopForKeyLearningsTest(unittest.TestCase):
     """Review item 2: "check that they landed" invites a literal launcher to
     run `mem_search` after every delegation. The fix is a deterministic
     signal instead -- the launcher's own instructions either state the save
-    runs automatically (the plugin's root-only `MEMORY_INSTRUCTIONS`, which
-    only ships where the capture does) or they don't, and it saves the
-    findings itself in the second case. Only `AMBIENT` and `CONVENTION` may
+    runs automatically (both the shared block and the convention say so
+    unconditionally: the capture runs in OpenCode and in Claude Code whenever
+    engram is selected), so the launcher never saves the items again nor
+    searches to confirm them. Only `AMBIENT` and `CONVENTION` may
     touch this subject at all, and only through their one pinned, negated
     paragraph each -- every other file, and any other paragraph in those two,
     fails."""
@@ -526,13 +417,6 @@ class NoVerificationLoopForKeyLearningsTest(unittest.TestCase):
         self.assertEqual(
             paragraphs_on(read(CONVENTION), VERIFICATION_LOOP_STEM), CONVENTION_VERIFICATION_LOOP_PARAGRAPHS
         )
-
-    def test_the_plugin_states_the_automatic_save_unconditionally(self):
-        # The plugin's own MEMORY_INSTRUCTIONS only ships where the capture
-        # runs, so it is the signal itself -- it states the save runs
-        # automatically without hedging, unlike the ambient block/convention.
-        text = memory_instructions()
-        self.assertIn("its items are saved automatically when it returns", text)
 
 
 class SubagentScopeReachesSharedSkillFilesTest(unittest.TestCase):
@@ -665,6 +549,15 @@ class EngramPluginPassiveCaptureNodeTest(unittest.TestCase):
             "the root session's own 'task' completion must still fire a passive capture",
         )
 
+    def test_the_plugin_registers_no_system_prompt_hook(self):
+        """The plugin used to append its own copy of the protocol to the root
+        session's system prompt. That copy is gone: the shared block carries
+        the protocol, so the plugin must not register the hook at all."""
+        hooks = self._run_harness()["hooks"]
+        self.assertNotIn("experimental.chat.system.transform", hooks)
+        self.assertIn("tool.execute.after", hooks)
+        self.assertIn("experimental.session.compacting", hooks)
+
     def test_the_posted_content_has_real_newlines_and_a_line_start_heading(self):
         data = self._run_harness()
         cases = {c["tool"]: c for c in data["cases"]}
@@ -712,6 +605,92 @@ class EngramLearningsFormatContractTest(unittest.TestCase):
         for heading, paths in mentions.items():
             with self.subTest(heading=heading, files=paths):
                 self.assertRegex(heading, ENGRAM_LEARNING_HEADER_PATTERN)
+
+
+class PluginNoLongerInjectsProtocolTest(unittest.TestCase):
+    """The protocol reaches every session through the shared block alone."""
+
+    def setUp(self):
+        self.text = read(PLUGIN)
+
+    def test_no_system_prompt_hook_in_the_source(self):
+        self.assertNotIn("system.transform", self.text)
+        self.assertNotIn("output.system", self.text)
+
+    def test_no_protocol_constant_in_the_source(self):
+        self.assertNotIn("MEMORY_INSTRUCTIONS", self.text)
+        self.assertNotIn("WHO WRITES", self.text)
+
+
+#: The sentence the shared block states for the agent talking with the person.
+KEY_LEARNINGS_AUTOMATIC = (
+    "Its items are saved automatically when its reply returns, one observation each: "
+    "don't save them again yourself, and never search memory just to confirm they landed."
+)
+
+
+class KeyLearningsAutomaticStatementTest(unittest.TestCase):
+    """The shared block states, unconditionally, that a launched agent's
+    `## Key Learnings` items are saved automatically. That is only true
+    because a capture is installed wherever the block is: the OpenCode
+    plugin ships on every install, and Claude Code's `SubagentStop` hook
+    ships whenever engram is selected -- the same condition that installs
+    the block. These tests render both CLIs with the shipped content."""
+
+    @classmethod
+    def setUpClass(cls):
+        from darq import cli
+        from darq.adapters.claudecode import Adapter as ClaudeAdapter
+        from darq.adapters.opencode import Adapter as OpenCodeAdapter
+        from darq.core import content as content_module
+        from darq.core.types import ConfigKeyArtifact, Environment, FileArtifact
+
+        cls.ConfigKeyArtifact, cls.FileArtifact = ConfigKeyArtifact, FileArtifact
+        home = Path("/home/example")
+        environment = Environment(home=home, data_dir=home / ".local" / "share" / "darq")
+        cls.identity = cli.default_identity()
+        loaded = content_module.load()
+        cls.with_engram = content_module.select_mcp(loaded, ["engram"])
+        cls.without_engram = content_module.select_mcp(loaded, [])
+        cls.adapters = {"opencode": OpenCodeAdapter(), "claudecode": ClaudeAdapter()}
+        cls.layouts = {name: adapter.layout(environment) for name, adapter in cls.adapters.items()}
+
+    def _rendered(self, name: str, loaded) -> str:
+        artifacts = self.adapters[name].render_system_prompt(
+            self.layouts[name], loaded.system_prompt, self.identity
+        )
+        files = [item for item in artifacts if isinstance(item, self.FileArtifact)]
+        self.assertEqual(len(files), 1)
+        return files[0].content.decode("utf-8")
+
+    def test_the_block_source_states_it_once(self):
+        self.assertEqual(" ".join(read(AMBIENT).split()).count(KEY_LEARNINGS_AUTOMATIC), 1)
+
+    def test_the_block_no_longer_hedges_on_the_launchers_own_instructions(self):
+        self.assertNotIn("If your own instructions state", read(AMBIENT))
+
+    def test_both_clis_render_the_statement_once_when_engram_is_selected(self):
+        for name in self.adapters:
+            with self.subTest(cli=name):
+                text = " ".join(self._rendered(name, self.with_engram).split())
+                self.assertEqual(text.count(KEY_LEARNINGS_AUTOMATIC), 1)
+
+    def test_neither_cli_renders_it_without_engram(self):
+        for name in self.adapters:
+            with self.subTest(cli=name):
+                text = " ".join(self._rendered(name, self.without_engram).split())
+                self.assertNotIn("saved automatically", text)
+
+    def test_claude_code_installs_the_subagent_stop_capture_with_engram(self):
+        engram = next(item for item in self.with_engram.mcp if item.name == "engram")
+        artifacts = self.adapters["claudecode"].render_mcp(self.layouts["claudecode"], engram)
+        pointers = {item.pointer for item in artifacts if isinstance(item, self.ConfigKeyArtifact)}
+        self.assertIn("/hooks/SubagentStop/-", pointers)
+
+    def test_opencode_ships_the_capturing_plugin_unconditionally(self):
+        adapter, layout = self.adapters["opencode"], self.layouts["opencode"]
+        artifacts = adapter.own_artifacts(layout, "darq-orchestrator", self.identity, ())
+        self.assertTrue(any(str(item.path).endswith("plugins/engram.ts") for item in artifacts))
 
 
 if __name__ == "__main__":

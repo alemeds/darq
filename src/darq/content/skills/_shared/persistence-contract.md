@@ -103,7 +103,7 @@ you return.
 
 Add this line only when the launcher wants this sub-agent's findings saved automatically instead of returned for the launcher to save:
 ```
-PERSISTENCE: End your reply with a `## Key Learnings` section — numbered, one durable finding per item, each a self-contained sentence on one line. Call no memory tool for it; whoever launched you takes care of saving it.
+PERSISTENCE: End your reply with a `## Key Learnings` section — numbered, one durable finding per item, each a self-contained sentence on one line. Call no memory tool for it; it is saved automatically when your reply returns.
 ```
 
 SDD (with dependencies):

@@ -12,6 +12,12 @@
  *   created on-demand — even if the plugin was loaded after the session
  *   started (restart, reconnect, etc.). The session ID comes from OpenCode's
  *   hooks (input.sessionID) rather than relying on a session.created event.
+ *
+ * No protocol text: this plugin never touches the system prompt. What an agent
+ * must do with memory (who writes, when to save) lives in the shared engram
+ * block installed with the instructions, which every session reads, sub-agents
+ * included. That block also says a launched agent's `## Key Learnings` items
+ * are saved automatically — this plugin's passive capture of `task` output.
  */
 
 import type { Plugin } from "@opencode-ai/plugin"
@@ -47,116 +53,6 @@ function isEngramTool(tool: string): boolean {
   const id = tool.toLowerCase()
   return ENGRAM_TOOLS.has(id) || ENGRAM_TOOLS.has(id.replace(/^engram_/, ""))
 }
-
-// ─── Memory Instructions ─────────────────────────────────────────────────────
-// These get injected into the agent's context so it knows to call mem_save.
-
-const MEMORY_INSTRUCTIONS = `## Engram Persistent Memory — Protocol
-
-You have access to Engram, a persistent memory system that survives across sessions and compactions.
-
-### WHO WRITES
-
-If you were launched by another agent, you make no memory writes — no \`mem_save\`,
-\`mem_update\`, \`mem_session_summary\`, nor the \`mem_judge\` that follows a save —
-unless your brief asks for one. You may still read memory: \`mem_search\`,
-\`mem_context\`, \`mem_get_observation\`. What deserves keeping goes in your reply;
-whoever launched you decides what to save.
-
-When your brief asks you to record learnings, end your reply with a \`## Key Learnings\`
-section: numbered, one durable finding per item, each a self-contained sentence on one
-line. That section is saved for you when your reply returns, so you call no memory tool
-for it. Without that request, write no such section.
-
-If you are the agent talking with the person, ask a launched agent's brief for any
-write you want it to make, and a durable finding in its reply is yours to save.
-
-To have a launched agent's findings saved this way, ask its brief to end with a
-\`## Key Learnings\` section; its items are saved automatically when it returns, one
-observation each — don't save them again yourself. Anything else durable in its reply
-is still yours to save.
-
-### WHEN TO SAVE (if you are the agent talking with the person)
-
-Call \`mem_save\` after any of these:
-- Bug fix completed
-- Architecture or design decision made
-- Non-obvious discovery about the codebase
-- Configuration change or environment setup
-- Pattern established (naming, structure, convention)
-- User preference or constraint learned
-
-When nothing durable happened — a check that only confirmed, an attempt that was
-blocked, a delegation that brought back nothing new — there is nothing to save. A
-topic already in memory is updated under its topic key rather than saved again.
-
-Format for \`mem_save\`:
-- **title**: Verb + what — short, searchable (e.g. "Fixed N+1 query in UserList", "Chose Zustand over Redux")
-- **type**: bugfix | decision | architecture | discovery | pattern | config | preference
-- **scope**: \`project\` (default) | \`personal\`
-- **topic_key** (optional, recommended for evolving decisions): stable key like \`architecture/auth-model\`
-- **content**:
-  **What**: One sentence — what was done
-  **Why**: What motivated it (user request, bug, performance, etc.)
-  **Where**: Files or paths affected
-  **Learned**: Gotchas, edge cases, things that surprised you (omit if none)
-
-Topic rules:
-- Different topics must not overwrite each other (e.g. architecture vs bugfix)
-- Reuse the same \`topic_key\` to update an evolving topic instead of creating new observations
-- If unsure about the key, call \`mem_suggest_topic_key\` first and then reuse it
-- Use \`mem_update\` when you have an exact observation ID to correct
-
-### WHEN TO SEARCH MEMORY
-
-When the user asks to recall something — any variation of "remember", "recall", "what did we do",
-"how did we solve", "recordar", "acordate", "qué hicimos", or references to past work:
-1. First call \`mem_context\` — checks recent session history (fast, cheap)
-2. If not found, call \`mem_search\` with relevant keywords (FTS5 full-text search)
-3. If you find a match, use \`mem_get_observation\` for full untruncated content
-
-Also search memory PROACTIVELY when:
-- Starting work on something that might have been done before
-- The user mentions a topic you have no context on — check if past sessions covered it
-- The user's FIRST message references the project, a feature, or a problem — call \`mem_search\` with keywords from their message to check for prior work before responding
-
-### SESSION CLOSE PROTOCOL (if you are the agent talking with the person)
-
-Only the agent talking with the person calls \`mem_session_summary\`, and only at a
-real close: the person says the session is ending, or asks for it. Finishing a
-task, getting a delegation back, or delivering a reply is not a close, and neither
-is saying "done" / "listo" / "that's it". At a real close:
-1. Call \`mem_session_summary\` with this structure:
-
-## Goal
-[What we were working on this session]
-
-## Instructions
-[User preferences or constraints discovered — skip if none]
-
-## Discoveries
-- [Technical findings, gotchas, non-obvious learnings]
-
-## Accomplished
-- [Completed items with key details]
-
-## Next Steps
-- [What remains to be done — for the next session]
-
-## Relevant Files
-- path/to/file — [what it does or what changed]
-
-This is NOT optional. If you skip this, the next session starts blind.
-
-### AFTER COMPACTION (if you are the agent talking with the person)
-
-If you are the agent talking with the person and you see a message about compaction or context reset, or "FIRST ACTION REQUIRED" in your context:
-1. IMMEDIATELY call \`mem_session_summary\` with the compacted summary content — this persists what was done before compaction
-2. Then call \`mem_context\` to recover any additional context from previous sessions
-3. Only THEN continue working
-
-Do not skip step 1. Without it, everything done before compaction is lost from memory. A sub-agent that hits compaction follows the WHO WRITES rule above instead: no \`mem_session_summary\` unless its brief asks for one.
-`
 
 // ─── HTTP Client ─────────────────────────────────────────────────────────────
 
@@ -525,35 +421,6 @@ export const Engram: Plugin = async (ctx) => {
             },
           })
         }
-      }
-    },
-
-    // ─── System Prompt: Always-on memory instructions ──────────
-    // Injects MEMORY_INSTRUCTIONS into the system prompt of every message.
-    // This ensures the agent ALWAYS knows about Engram, even after compaction.
-    //
-    // We append to the last existing system entry instead of pushing a new one.
-    // Some models (Qwen3.5, Mistral/Ministral via llama.cpp) reject multiple
-    // system messages — their Jinja chat templates only allow a single system
-    // block at the beginning. By concatenating, we avoid adding extra system
-    // messages that would break these models. See: GitHub issue #23.
-
-    "experimental.chat.system.transform": async (input, output) => {
-      // Subagent sessions do not write memory (see the WHO WRITES section of
-      // MEMORY_INSTRUCTIONS above) — injecting the write-triggering protocol
-      // into their system prompt would tell them to do writes their brief
-      // never asked for, so we skip them the same way chat.message and
-      // tool.execute.after already do. `sessionID` is optional on this hook,
-      // so we fail CLOSED on a missing one rather than open: when engram is
-      // selected, the ambient block already carries the protocol to the root
-      // session, so skipping this injection costs nothing there; without
-      // engram there are no mem tools to instruct anyway.
-      if (!input.sessionID || subAgentSessions.has(input.sessionID)) return
-
-      if (output.system.length > 0) {
-        output.system[output.system.length - 1] += "\n\n" + MEMORY_INSTRUCTIONS
-      } else {
-        output.system.push(MEMORY_INSTRUCTIONS)
       }
     },
 
