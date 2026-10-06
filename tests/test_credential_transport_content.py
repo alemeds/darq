@@ -69,9 +69,15 @@ AGENTS_CREDENTIAL_TRANSPORT_PARAGRAPHS = frozenset(
         "A credential the person gives you in this conversation is theirs to manage: use it for the "
         "task. Never advise them to rotate, revoke, or regenerate it, and never refuse to use it "
         "because it appeared in the conversation.",
-        "When a value has been stood in for a variable like `$DARQ_SECRET_TOKEN`, use that "
+        "When a value has been stood in for a variable like `$DARQ_SECRET_<NAME>`, use that "
         "variable name — a shell command expands it — and pass the name, never the value, into any "
         "brief, command, file, memory write, or reply you produce.",
+        "A credential that reaches you as written, as-is in the person's own message, was not stood "
+        "in: use it as given, for the task. Keep it out of commits, memory writes and any file other "
+        "than a sensitive file the person asked you to keep it in, never repeat it in a reply, and "
+        "put it in a brief only when the launched agent needs it for the task. A "
+        "`$DARQ_SECRET_<NAME>` variable exists only when the person's own message shows that exact "
+        "name: never make one up, and never ask the person to define one.",
         "Never print a credential variable: no `echo`, and no verbose flag that would dump headers "
         "or an environment.",
     }
@@ -82,6 +88,31 @@ class AgentsCredentialTransportSectionTest(unittest.TestCase):
     def test_the_section_carries_exactly_the_pinned_paragraphs(self):
         text = read(AGENTS_MD)
         self.assertTrue(AGENTS_CREDENTIAL_TRANSPORT_PARAGRAPHS <= set(paragraphs_of(text)))
+
+    def _transport_section(self):
+        return read(AGENTS_MD).split("## Credential Transport", 1)[1].split("## DELIVERY GUARANTEE", 1)[0]
+
+    def test_a_credential_given_as_written_is_used_as_given_for_the_task(self):
+        section = self._transport_section()
+        self.assertIn("as-is in the person's own message, was not stood in: use it as given, for the task", section)
+
+    def test_a_credential_given_as_written_stays_out_of_commits_memory_files_and_replies(self):
+        section = self._transport_section()
+        for phrase in (
+            "Keep it out of commits, memory writes and any file other than a sensitive file the person asked you to keep it in",
+            "never repeat it in a reply",
+            "put it in a brief only when the launched agent needs it for the task",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, section)
+
+    def test_a_variable_is_never_invented_nor_requested(self):
+        section = self._transport_section()
+        self.assertIn("exists only when the person's own message shows that exact name", section)
+        self.assertIn("never make one up, and never ask the person to define one", section)
+
+    def test_no_concrete_example_variable_name_is_left_to_copy(self):
+        self.assertNotIn("$DARQ_SECRET_TOKEN", read(AGENTS_MD))
 
     def test_the_section_never_names_a_cli(self):
         # Redundant with `test_content_core_is_cli_agnostic.py` (which scans
