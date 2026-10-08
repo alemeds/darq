@@ -100,6 +100,8 @@ Format for `mem_save`:
   - **Where**: Files or paths affected
   - **Learned**: Gotchas, edge cases, things that surprised you (omit if none)
 
+Write the title and the content in normal prose, with a space between words and every word spelled out whole. Memory search matches whole words, so a fused word like `credentialchanges` is never found by a search for `credential`. This holds however long the session has run.
+
 ## Topic Update Rules
 
 - Different topics MUST NOT overwrite each other

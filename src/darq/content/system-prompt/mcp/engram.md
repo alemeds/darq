@@ -35,6 +35,8 @@ Only you call `mem_session_summary`, and only at a real close: the person says t
 
 If you hit a compaction, call `mem_session_summary` with the compacted summary FIRST, so what happened before it is not lost, then `mem_context`, and only then continue working.
 
+Write every memory — title and content alike — in normal prose, with a space between words and every word spelled out whole. Memory search matches whole words, so a fused word like `credentialchanges` is never found by a search for `credential`, and a memory nobody can find is a memory lost. This holds however long the session has run.
+
 ### Search before you assume
 
 On any variation of "remember", "recall", "what did we do", "how did we solve" — in whatever language the user writes — go `mem_context` first (fast), then `mem_search`, then `mem_get_observation` for the full untruncated text. Search proactively too: before starting work that may have been done before, when the user names a topic you have no context on, and when their first message references the project, a feature or a problem.

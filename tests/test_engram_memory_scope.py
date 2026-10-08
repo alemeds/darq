@@ -272,6 +272,51 @@ class ConventionScopeTest(unittest.TestCase):
         self.assertEqual(paragraphs_on(self.text, KEY_LEARNINGS_MANDATE_STEM), set())
 
 
+class WholeWordMemoryWritesTest(unittest.TestCase):
+    """Long sessions can fuse words in memory writes ("credentialchanges"), and
+    memory search matches whole words, so such a memory is never found. Both the
+    ambient block and the convention carry the rule: title and content, whole
+    words, and it holds however long the session runs."""
+
+    AMBIENT_RULE = (
+        "Write every memory \u2014 title and content alike \u2014 in normal prose, with a space between words "
+        "and every word spelled out whole. Memory search matches whole words, so a fused word like "
+        "`credentialchanges` is never found by a search for `credential`, and a memory nobody can find is a "
+        "memory lost. This holds however long the session has run."
+    )
+    CONVENTION_RULE = (
+        "Write the title and the content in normal prose, with a space between words and every word spelled "
+        "out whole. Memory search matches whole words, so a fused word like `credentialchanges` is never "
+        "found by a search for `credential`. This holds however long the session has run."
+    )
+
+    @staticmethod
+    def _paragraphs(text):
+        return [" ".join(p.split()) for p in re.split(r"\n\s*\n", text)]
+
+    def test_the_ambient_block_carries_the_pinned_paragraph_once(self):
+        found = [p for p in self._paragraphs(read(AMBIENT)) if "fused word" in p]
+        self.assertEqual(found, [self.AMBIENT_RULE])
+
+    def test_the_convention_carries_the_pinned_paragraph_once(self):
+        found = [p for p in self._paragraphs(read(CONVENTION)) if "fused word" in p]
+        self.assertEqual(found, [self.CONVENTION_RULE])
+
+    def test_the_rule_covers_title_and_content_whole_words_and_any_session_length(self):
+        for path in (AMBIENT, CONVENTION):
+            with self.subTest(path=path.name):
+                text = " ".join(read(path).split())
+                self.assertIn("title and", text)
+                self.assertIn("content", text)
+                self.assertIn("matches whole words", text)
+                self.assertIn("however long the session has run", text)
+
+    def test_the_convention_rule_sits_in_the_save_format_part(self):
+        text = read(CONVENTION)
+        self.assertLess(text.index("## Save Format"), text.index("fused word"))
+        self.assertLess(text.index("fused word"), text.index("## Topic Update Rules"))
+
+
 class NonSDDWriteMandateGoneTest(unittest.TestCase):
     """Blocking 1: the orchestrator's Non-SDD launch template used to read
     "you MUST save them to engram before returning ... Do NOT return without

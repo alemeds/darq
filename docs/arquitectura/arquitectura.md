@@ -2450,3 +2450,26 @@ Escribir un valor reemplazado con `printf … >> .env` pasa por la shell, así q
 Los tests fijan las dos secciones, leyendo el texto del `AGENTS.md` que se distribuye, y que no quede ningún `$DARQ_SECRET_TOKEN` en el contenido. La nota del plugin de OpenCode («usá el nombre de la variable, nunca el valor») no se contradice con lo nuevo, porque escribir un valor reemplazado en un archivo permitido expandiendo la variable sigue usando el nombre, y no se tocó. `MANUAL.md` y `MANUAL-claude-code.md` describen ahora el permiso por archivo nombrado.
 
 **Descartado: detectar localhost o testing para relajar las reglas.** Un túnel o un port-forward a `localhost` puede ser producción, así que «es local» no dice nada confiable sobre el destino. La regla queda igual para todos los casos: una credencial tal cual se usa como viene, y una variable sólo existe si la persona la mostró.
+
+## 7.7.4: las memorias se escriben con las palabras separadas
+
+En sesiones largas de OpenCode, los modelos de la familia GPT-6 a veces escriben una memoria con las palabras pegadas: «credentialchanges», «fabricatedacceptance», «Usermanualflowjust». Pasa sólo en la sesión raíz.
+
+**Datos medidos.**
+
+- Crece con el tamaño del contexto: 0% por debajo de 50k tokens, 1% entre 50k y 100k, 4% entre 100k y 150k, 24% entre 150k y 200k, 28% entre 200k y 300k, y 36% por encima de 300k.
+- Se refuerza solo: después de una llamada con palabras pegadas, la siguiente sale pegada el 84% de las veces; después de una limpia, el 16%.
+- Depende del modelo: GPT-6.1 Sol 27%, GPT-6 Astra 9%, GPT-5.6 Terra 0 de 529.
+
+**Por qué importa en la memoria.** La búsqueda de texto completo de engram compara palabras enteras. Una memoria con «credentialchanges» no aparece al buscar «credential», y se verificó sobre una observación real. En un brief a un sub-agente el mismo defecto es molesto pero se entiende; en una memoria deja la información perdida.
+
+**Decisión: una regla para las escrituras de memoria, nada más.**
+
+1. **Bloque compartido** (`system-prompt/mcp/engram.md`, para las dos CLIs, antes de `### Search before you assume`): un párrafo que pide escribir cada memoria, título y contenido, en prosa normal, con espacio entre palabras y cada palabra completa; explica que la búsqueda compara palabras enteras y que vale por larga que sea la sesión.
+2. **Convención** (`mcp/engram.md`, sección `## Save Format`): la misma regla, más breve, para quien lee el formato de `mem_save`. El texto sigue sin nombrar ninguna CLI.
+3. **Tests.** `tests/test_engram_memory_scope.py` fija los dos párrafos exactos y comprueba que la regla cubre título y contenido, explica la búsqueda de palabras enteras y dice que vale en sesiones largas.
+
+**Descartado.**
+
+- **Tocar los briefs.** El orquestador y los sub-agentes se siguen entendiendo con palabras pegadas, y el problema es circunstancial a GPT-6 en sesiones largas. La regla del orquestador contra palabras pegadas en los briefs queda como está.
+- **Un guard en runtime** que rechace o corrija una escritura con palabras pegadas. Se consideró y no se hizo: la decisión fue empezar por la regla de contenido. Unos días después de publicar 7.7.4 se vuelve a medir con la misma heurística; si siguen apareciendo memorias pegadas, el paso siguiente es un control sólo sobre las escrituras de memoria, no sobre los briefs.
